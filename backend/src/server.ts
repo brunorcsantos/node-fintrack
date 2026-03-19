@@ -6,6 +6,7 @@ import { authRoutes } from "./routes/auth";
 import { transactionRoutes } from "./routes/transactions";
 import { categoryRoutes } from "./routes/categories";
 import { budgetRoutes } from "./routes/budgets";
+import { profileRoutes } from "./routes/profile";
 
 async function main() {
   const app = Fastify({ logger: true });
@@ -43,6 +44,7 @@ async function main() {
   await app.register(transactionRoutes);
   await app.register(categoryRoutes);
   await app.register(budgetRoutes);
+  await app.register(profileRoutes);
 
   // ── Health check ───────────────────────────────────────────────────────────
   app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));

@@ -8,17 +8,19 @@ interface AddModalProps {
   categories: Category[];
   onAdd: (tx: Omit<Transaction, "id" | "category" | "subcategory">) => void;
   onClose: () => void;
+  editingTransaction?: Transaction | null;
 }
 
-export default function AddModal({ categories, onAdd, onClose }: AddModalProps) {
+export default function AddModal({ categories, onAdd, onClose, editingTransaction }: AddModalProps) {
+  const isEditing = !!editingTransaction;
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [type, setType] = useState<"expense" | "income">("expense");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [subcategoryId, setSubcategoryId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
+  const [type, setType] = useState<"expense" | "income">(editingTransaction?.type || "expense");
+  const [description, setDescription] = useState(editingTransaction?.description || "");
+  const [amount, setAmount] = useState(editingTransaction?.amount ? String(editingTransaction.amount) : "");
+  const [categoryId, setCategoryId] = useState(editingTransaction?.categoryId || "");
+  const [subcategoryId, setSubcategoryId] = useState(editingTransaction?.subcategoryId || "");
+  const [date, setDate] = useState(editingTransaction?.date || new Date().toISOString().slice(0, 10));
+  const [notes, setNotes] = useState(editingTransaction?.notes || "");
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -66,7 +68,7 @@ export default function AddModal({ categories, onAdd, onClose }: AddModalProps) 
         {/* Título */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)" }}>
-            Novo Lançamento
+            {isEditing ? "Editar Lançamento" : "Novo Lançamento"}
           </h3>
           <button onClick={onClose} style={{
             background: "none", border: "none",
@@ -246,7 +248,7 @@ export default function AddModal({ categories, onAdd, onClose }: AddModalProps) 
             onClick={handleSubmit}
             disabled={!description.trim() || !amount || !date}
           >
-            Salvar Lançamento
+            {isEditing ? "Salvar Alterações" : "Salvar Lançamento"}
           </button>
         </div>
 

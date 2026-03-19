@@ -125,6 +125,21 @@ class ApiClient {
     return this.request<User>("/auth/me");
   }
 
+  // Profile
+  async updateProfile(data: Partial<{ name: string; email: string }>) {
+    return this.request<User>("/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePassword(data: { currentPassword: string; newPassword: string }) {
+    return this.request<{ message: string }>("/profile/password", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
   // Categories
   async getCategories() {
     return this.request<Category[]>("/categories");
@@ -190,6 +205,8 @@ class ApiClient {
     categoryId?: string;
     type?: string;
     page?: number;
+    limit?: number;
+    search?: string;
   }) {
     const qs = new URLSearchParams(
       Object.entries(params)

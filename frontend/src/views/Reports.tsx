@@ -42,7 +42,7 @@ export default function Reports({ categories, filterMonth }: ReportsProps) {
   const monthlyData = Object.entries(monthlyMap)
     .sort()
     .map(([month, v]) => ({
-      month: new Date(month + "-01").toLocaleDateString("pt-BR", {
+      month: new Date(month + "-02T12:00:00").toLocaleDateString("pt-BR", {
         month: "short",
         year: "2-digit",
       }),
@@ -66,6 +66,13 @@ export default function Reports({ categories, filterMonth }: ReportsProps) {
     })
     .sort((a, b) => b.value - a.value);
 
+  // Cores para gráficos — Recharts não suporta CSS variables em props SVG
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const GREEN = isDark ? "#5AB88A" : "#2a9870";
+  const RED   = isDark ? "#E85A7A" : "#d83a5a";
+  const MUTED = isDark ? "#666680" : "#8888aa";
+  const GRID  = isDark ? "#ffffff0f" : "#e8eaf0";
+
   const tooltipStyle = {
     background: "var(--bg-elevated)",
     border: "1px solid var(--border-default)",
@@ -74,7 +81,7 @@ export default function Reports({ categories, filterMonth }: ReportsProps) {
     fontSize: 12,
   };
   const tooltipFormatter = (v: number | undefined) => v !== undefined ? fmt(v) : "";
-  const axisProps = { stroke: "var(--text-muted)", tick: { fontSize: 11, fill: "var(--text-muted)" } };
+  const axisProps = { stroke: MUTED, tick: { fontSize: 11, fill: MUTED } };
 
   const emptyState = (
     <div style={{ color: "var(--text-muted)", textAlign: "center" as const, padding: "40px 0", fontSize: 14 }}>
@@ -126,12 +133,12 @@ export default function Reports({ categories, filterMonth }: ReportsProps) {
         {monthlyData.length === 0 ? emptyState : (
           <ResponsiveContainer width="100%" height={isMobile ? 200 : 280}>
             <BarChart data={monthlyData} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="month" {...axisProps} />
               <YAxis {...axisProps} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
-              <Bar dataKey="income" name="Receitas" fill="var(--accent-green)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Despesas" fill="var(--accent-red)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name="Receitas" fill={GREEN} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name="Despesas" fill={RED} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -143,12 +150,12 @@ export default function Reports({ categories, filterMonth }: ReportsProps) {
         {monthlyData.length === 0 ? emptyState : (
           <ResponsiveContainer width="100%" height={isMobile ? 180 : 220}>
             <LineChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
               <XAxis dataKey="month" {...axisProps} />
               <YAxis {...axisProps} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="income" name="Receita" stroke="var(--accent-green)" strokeWidth={2} dot={{ fill: "var(--accent-green)", r: 3 }} />
-              <Line type="monotone" dataKey="expense" name="Despesa" stroke="var(--accent-red)" strokeWidth={2} dot={{ fill: "var(--accent-red)", r: 3 }} />
+              <Line type="monotone" dataKey="income" name="Receita" stroke={GREEN} strokeWidth={2} dot={{ fill: GREEN, r: 3 }} />
+              <Line type="monotone" dataKey="expense" name="Despesa" stroke={RED} strokeWidth={2} dot={{ fill: RED, r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         )}

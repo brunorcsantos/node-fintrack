@@ -5,6 +5,8 @@ import { S } from "../styles";
 import { api } from "../lib/api";
 import EmojiPicker from "../components/EmojiPicker";
 import ColorPicker from "../components/ColorPicker";
+import Profile from "../components/Profile";
+import { useAuth } from "../context/AuthContext";
 
 interface SetupProps {
   categories: Category[];
@@ -12,6 +14,8 @@ interface SetupProps {
 }
 
 export default function Setup({ categories, onCategoriesChange }: SetupProps) {
+  const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<"categories" | "profile">("profile");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [showNewCat, setShowNewCat] = useState(false);
@@ -125,13 +129,54 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-      {/* Cabeçalho */}
+      {/* Cabeçalho com tabs */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ ...S.pageTitle }}>⚙️ Configurações</h2>
-        <button style={S.btn("primary")} onClick={() => { setShowNewCat(true); setCatError(""); }}>
-          + Nova Categoria
-        </button>
       </div>
+
+      {/* Tabs */}
+      <div style={{
+        display: "flex", gap: 4,
+        background: "var(--bg-elevated)",
+        borderRadius: "var(--radius-md)",
+        padding: 4, width: "fit-content",
+      }}>
+        {([
+          { key: "profile", label: "👤 Perfil" },
+          { key: "categories", label: "🗂️ Categorias" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "var(--radius-sm)",
+              border: "none", cursor: "pointer",
+              fontSize: 13, fontWeight: 600,
+              background: activeTab === tab.key ? "var(--bg-surface)" : "transparent",
+              color: activeTab === tab.key ? "var(--text-primary)" : "var(--text-muted)",
+              boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Perfil */}
+      {activeTab === "profile" && user && (
+        <Profile user={user} onUpdate={updateUser} />
+      )}
+
+      {/* Tab: Categorias */}
+      {activeTab === "categories" && (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button style={S.btn("primary")} onClick={() => { setShowNewCat(true); setCatError(""); }}>
+              + Nova Categoria
+            </button>
+          </div>
 
       {/* Form nova categoria */}
       {showNewCat && (
@@ -277,6 +322,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
           )}
         </div>
       ))}
+        </> 
+      )}
 
       {/* Modal editar categoria */}
       {editingCat && (
@@ -337,3 +384,5 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
     </div>
   );
 }
+
+// ─── Profile Section ──────────────────────────────────────────────────────────

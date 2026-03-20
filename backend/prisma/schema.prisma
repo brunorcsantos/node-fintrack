@@ -5,8 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
@@ -20,6 +20,7 @@ model User {
   transactions Transaction[]
   categories   Category[]
   budgets      Budget[]
+  recurring    RecurringTransaction[]
 }
 
 model Category {
@@ -35,6 +36,7 @@ model Category {
   subcategories Subcategory[]
   transactions  Transaction[]
   budgets       Budget[]
+  recurring     RecurringTransaction[]
 
   @@unique([slug, userId])
 }
@@ -50,6 +52,7 @@ model Subcategory {
 
   transactions Transaction[]
   budgets      Budget[]
+  recurring    RecurringTransaction[]
 
   @@unique([slug, categoryId])
 }
@@ -91,6 +94,34 @@ model Budget {
   createdAt     DateTime     @default(now())
 
   @@unique([userId, categoryId, subcategoryId, month])
+}
+
+model RecurringTransaction {
+  id            String    @id @default(uuid())
+  description   String
+  amount        Decimal?  @db.Decimal(12, 2)
+  type          TxType
+  categoryId    String
+  subcategoryId String?
+  userId        String
+  frequency     Frequency
+  dayOfMonth    Int       // dia do mês para mensal (1-31)
+  startDate     DateTime
+  endDate       DateTime?
+  active        Boolean   @default(true)
+  lastCreatedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([userId, active])
+}
+
+enum Frequency {
+  monthly
+  yearly
 }
 
 enum TxType {

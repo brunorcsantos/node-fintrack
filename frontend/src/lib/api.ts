@@ -49,6 +49,35 @@ export interface Budget {
   subcategory?: Subcategory;
 }
 
+export interface Recurring {
+  id: string;
+  description: string;
+  amount?: number;
+  type: "income" | "expense";
+  frequency: "monthly" | "yearly";
+  dayOfMonth: number;
+  startDate: string;
+  endDate?: string;
+  active: boolean;
+  lastCreatedAt?: string;
+  categoryId: string;
+  subcategoryId?: string;
+  category: Category;
+  subcategory?: Subcategory;
+}
+
+export type RecurringInput = {
+  description: string;
+  amount?: number;
+  type: "income" | "expense";
+  categoryId: string;
+  subcategoryId?: string;
+  frequency: "monthly" | "yearly";
+  dayOfMonth: number;
+  startDate: string;
+  endDate?: string;
+};
+
 export interface TransactionList {
   data: Transaction[];
   total: number;
@@ -273,6 +302,43 @@ class ApiClient {
 
   async deleteBudget(id: string) {
     return this.request<void>(`/budgets/${id}`, { method: "DELETE" });
+  }
+
+  // Recurring
+  async getRecurring() {
+    return this.request<Recurring[]>("/recurring");
+  }
+
+  async getPendingRecurring() {
+    return this.request<Recurring[]>("/recurring/pending");
+  }
+
+  async createRecurring(data: RecurringInput) {
+    return this.request<Recurring>("/recurring", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateRecurring(id: string, data: Partial<RecurringInput>) {
+    return this.request<Recurring>(`/recurring/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteRecurring(id: string) {
+    return this.request<void>(`/recurring/${id}`, { method: "DELETE" });
+  }
+
+  async confirmRecurring(
+    id: string,
+    data?: { amount?: number; date?: string },
+  ) {
+    return this.request<Transaction>(`/recurring/${id}/confirm`, {
+      method: "POST",
+      body: JSON.stringify(data || {}),
+    });
   }
 }
 

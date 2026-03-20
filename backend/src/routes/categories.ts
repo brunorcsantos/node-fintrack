@@ -17,35 +17,68 @@ const subcategorySchema = z.object({
   icon: z.string(),
 });
 
+const security = [{ bearerAuth: [] }];
+
 export async function categoryRoutes(app: FastifyInstance) {
   // GET /categories — list with subcategories
-  app.get("/categories", { onRequest: [authenticate] }, async (req) => {
-    const { sub: userId } = req.user as { sub: string };
-    return prisma.category.findMany({
-      where: { userId },
-      include: { subcategories: true },
-      orderBy: { name: "asc" },
-    });
-  });
+  app.get(
+    "/categories",
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Listar categorias com subcategorias",
+        security,
+      },
+      onRequest: [authenticate],
+    },
+    async (req) => {
+      const { sub: userId } = req.user as { sub: string };
+      return prisma.category.findMany({
+        where: { userId },
+        include: { subcategories: true },
+        orderBy: { name: "asc" },
+      });
+    },
+  );
 
   // POST /categories
-  app.post("/categories", { onRequest: [authenticate] }, async (req, reply) => {
-    const { sub: userId } = req.user as { sub: string };
-    const parsed = categorySchema.safeParse(req.body);
-    if (!parsed.success)
-      return reply.status(400).send({ error: parsed.error.flatten() });
+  app.post(
+    "/categories",
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Criar categoria",
+        security,
+        body: categorySchema,
+      },
+      onRequest: [authenticate],
+    },
+    async (req, reply) => {
+      const { sub: userId } = req.user as { sub: string };
+      const parsed = categorySchema.safeParse(req.body);
+      if (!parsed.success)
+        return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const cat = await prisma.category.create({
-      data: { ...parsed.data, userId },
-      include: { subcategories: true },
-    });
-    return reply.status(201).send(cat);
-  });
+      const cat = await prisma.category.create({
+        data: { ...parsed.data, userId },
+        include: { subcategories: true },
+      });
+      return reply.status(201).send(cat);
+    },
+  );
 
   // PUT /categories/:id
   app.put(
     "/categories/:id",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Atualizar categoria",
+        security,
+        body: categorySchema.partial(),
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id } = req.params as { id: string };
@@ -68,7 +101,10 @@ export async function categoryRoutes(app: FastifyInstance) {
   // DELETE /categories/:id
   app.delete(
     "/categories/:id",
-    { onRequest: [authenticate] },
+    {
+      schema: { tags: ["Categories"], summary: "Remover categoria", security },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id } = req.params as { id: string };
@@ -92,7 +128,15 @@ export async function categoryRoutes(app: FastifyInstance) {
   // POST /categories/:id/subcategories
   app.post(
     "/categories/:id/subcategories",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Criar subcategoria",
+        security,
+        body: subcategorySchema,
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id: categoryId } = req.params as { id: string };
@@ -116,7 +160,14 @@ export async function categoryRoutes(app: FastifyInstance) {
   // DELETE /categories/:id/subcategories/:subId
   app.delete(
     "/categories/:id/subcategories/:subId",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Remover subcategoria",
+        security,
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id: categoryId, subId } = req.params as {
@@ -146,7 +197,15 @@ export async function categoryRoutes(app: FastifyInstance) {
   // PUT /categories/:id/subcategories/:subId
   app.put(
     "/categories/:id/subcategories/:subId",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Categories"],
+        summary: "Atualizar subcategoria",
+        security,
+        body: subcategorySchema.partial(),
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id: categoryId, subId } = req.params as {

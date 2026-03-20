@@ -148,9 +148,7 @@ export default function AuthenticatedApp() {
     },
     [addTransaction],
   );
-  console.log("search:", search);
-  console.log("debouncedSearch:", debouncedSearch);
-  console.log("transactions:", transactions.length);
+  
   return (
     <div style={{ ...S.app, minWidth: 0, overflowX: "hidden" }}>
       <Header

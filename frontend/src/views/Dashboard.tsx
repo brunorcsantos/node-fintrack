@@ -6,6 +6,8 @@ import type { View } from "../types";
 import { S } from "../styles";
 import { fmt, fmtDate } from "../helpers";
 import ProgressBar from "../components/ProgressBar";
+import RecurringAlerts from "../components/RecurringAlerts";
+import { useRecurring } from "../hooks/useRecurring";
 
 interface DashboardProps {
   filteredTx: Transaction[];
@@ -25,6 +27,12 @@ export default function Dashboard({
   setView,
 }: DashboardProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+   const [dismissed, setDismissed] = useState<string[]>([]);
+  const { pending, confirmRecurring } = useRecurring();
+
+  const visiblePending = pending.filter((r) => !dismissed.includes(r.id));
+ 
+  const handleDismiss = (id: string) => setDismissed((prev) => [...prev, id]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -53,6 +61,16 @@ export default function Dashboard({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 12 : 20 }}>
+
+      {/* Alertas de recorrentes */}
+      {visiblePending.length > 0 && (
+        <RecurringAlerts
+          pending={visiblePending}
+          categories={categories}
+          onConfirm={confirmRecurring}
+          onDismiss={handleDismiss}
+        />
+      )}
 
       {/* Stats */}
       <div style={{

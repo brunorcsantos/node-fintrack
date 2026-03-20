@@ -26,46 +26,68 @@ const listSchema = z.object({
   limit: z.coerce.number().default(50),
 });
 
+const security = [{ bearerAuth: [] }];
+
 export async function transactionRoutes(app: FastifyInstance) {
   // GET /transactions
-  app.get("/transactions", { onRequest: [authenticate] }, async (req) => {
-    const { sub: userId } = req.user as { sub: string };
-    const query = listSchema.parse(req.query);
+  app.get(
+    "/transactions",
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Listar transações",
+        security,
+        querystring: listSchema,
+      },
+      onRequest: [authenticate],
+    },
+    async (req) => {
+      const { sub: userId } = req.user as { sub: string };
+      const query = listSchema.parse(req.query);
 
-    const where: any = { userId };
+      const where: any = { userId };
 
-    if (query.month) {
-      const [year, month] = query.month.split("-").map(Number);
-      where.date = {
-        gte: new Date(Date.UTC(year, month - 1, 1)),
-        lt: new Date(Date.UTC(year, month, 1)),
-      };
-    }
-    if (query.categoryId) where.categoryId = query.categoryId;
-    if (query.type) where.type = query.type;
-    if (query.search) {
-      where.description = { contains: query.search, mode: "insensitive" };
-    }
+      if (query.month) {
+        const [year, month] = query.month.split("-").map(Number);
+        where.date = {
+          gte: new Date(Date.UTC(year, month - 1, 1)),
+          lt: new Date(Date.UTC(year, month, 1)),
+        };
+      }
+      if (query.categoryId) where.categoryId = query.categoryId;
+      if (query.type) where.type = query.type;
+      if (query.search) {
+        where.description = { contains: query.search, mode: "insensitive" };
+      }
 
-    const [data, total] = await Promise.all([
-      prisma.transaction.findMany({
-        where,
-        include: { category: true, subcategory: true },
-        orderBy: { date: "desc" },
-        skip: (query.page - 1) * query.limit,
-        take: query.limit,
-      }),
-      prisma.transaction.count({ where }),
-    ]);
-            console.log("query:", query);
-            console.log("where:", where);
-    return { data, total, page: query.page, limit: query.limit };
-  });
+      const [data, total] = await Promise.all([
+        prisma.transaction.findMany({
+          where,
+          include: { category: true, subcategory: true },
+          orderBy: { date: "desc" },
+          skip: (query.page - 1) * query.limit,
+          take: query.limit,
+        }),
+        prisma.transaction.count({ where }),
+      ]);
+      console.log("query:", query);
+      console.log("where:", where);
+      return { data, total, page: query.page, limit: query.limit };
+    },
+  );
 
   // POST /transactions
   app.post(
     "/transactions",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Criar transação",
+        security,
+        body: createSchema,
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const parsed = createSchema.safeParse(req.body);
@@ -81,7 +103,7 @@ export async function transactionRoutes(app: FastifyInstance) {
         },
         include: { category: true, subcategory: true },
       });
-      
+
       return reply.status(201).send(tx);
     },
   );
@@ -89,7 +111,14 @@ export async function transactionRoutes(app: FastifyInstance) {
   // DELETE /transactions/:id
   app.delete(
     "/transactions/:id",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Remover transação",
+        security,
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id } = req.params as { id: string };
@@ -106,7 +135,15 @@ export async function transactionRoutes(app: FastifyInstance) {
   // PUT /transactions/:id
   app.put(
     "/transactions/:id",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Atualizar transação",
+        security,
+        body: createSchema.partial(),
+      },
+      onRequest: [authenticate],
+    },
     async (req, reply) => {
       const { sub: userId } = req.user as { sub: string };
       const { id } = req.params as { id: string };
@@ -136,7 +173,17 @@ export async function transactionRoutes(app: FastifyInstance) {
   // GET /transactions/summary — aggregated data for charts
   app.get(
     "/transactions/summary",
-    { onRequest: [authenticate] },
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Resumo para gráficos",
+        security,
+        querystring: z.object({
+          month: z.string().optional().describe("Mês YYYY-MM"),
+        }),
+      },
+      onRequest: [authenticate],
+    },
     async (req) => {
       const { sub: userId } = req.user as { sub: string };
       const { month } = req.query as { month?: string };

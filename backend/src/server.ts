@@ -88,24 +88,10 @@ async function main() {
 
   // ── Plugins ────────────────────────────────────────────────────────────────
   await app.register(cors, {
-    origin: (origin, cb) => {
-      const allowed = [
-        process.env.FRONTEND_URL || "http://localhost:5173",
-        "http://localhost:5173",
-        "http://localhost:3333",
-      ];
-      // Permite requisições sem origin (ex: Swagger UI, Postman, mobile)
-      if (!origin || allowed.includes(origin)) {
-        cb(null, true);
-      } else {
-        cb(new Error("Not allowed by CORS"), false);
-      }
-    },
+    origin: true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    preflight: true,
-    strictPreflight: false,
   });
 
   await app.register(jwt, {

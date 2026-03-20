@@ -19,7 +19,6 @@ import swaggerUi from "@fastify/swagger-ui";
 async function main() {
   const app = Fastify({ logger: true });
 
-
   // ── Zod type provider ─────────────────────────────────────────────────────
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -88,7 +87,8 @@ async function main() {
 
   // ── Plugins ────────────────────────────────────────────────────────────────
   await app.register(cors, {
-    origin: true,
+    origin:
+      process.env.NODE_ENV === "production" ? process.env.FRONTEND_URL : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],

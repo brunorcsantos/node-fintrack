@@ -2,10 +2,10 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import type { Category, Transaction } from "../lib/api";
 import { S } from "../styles";
-import { fmt, fmtDate } from "../helpers";
+import { fmt } from "../helpers";
 import Badge from "../components/Badge";
 import AddModal from "../components/AddModal";
-import Pagination from "../components/Pagination";
+import TransactionList from "../components/TransactionList";
 
 interface TransactionsProps {
   filteredTx: Transaction[];
@@ -57,21 +57,11 @@ export default function Transactions({
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  
-
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  useEffect(() => {
-  if (searchRef.current) {
-    const len = searchRef.current.value.length;
-    searchRef.current.focus();
-    searchRef.current.setSelectionRange(len, len);
-  }
-}, [filteredTx]);
 
   // Categoria local selecionada
   const selectedCategory = useMemo(
@@ -108,16 +98,6 @@ export default function Transactions({
     setFilterCategoryLocal(catId);
     setFilterSubcategory("all");
   };
-
-  // Aplica apenas filtro de subcategoria localmente — demais filtros já vêm do backend
-  const displayedTx = useMemo(() => {
-    return filteredTx
-      .filter(
-        (tx) =>
-          filterSubcategory === "all" || tx.subcategoryId === filterSubcategory,
-      )
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [filteredTx, filterSubcategory]);
 
   const hasActiveFilters =
     filterType !== "all" ||
@@ -369,11 +349,17 @@ export default function Transactions({
             </span>
             <input
               ref={searchRef}
-              autoFocus={!!search}
+              autoFocus
               type="text"
               placeholder="Buscar por descrição ou observação..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                const len = e.target.value.length;
+                setSearch(e.target.value);
+                requestAnimationFrame(() => {
+                  searchRef.current?.setSelectionRange(len, len);
+                });
+              }}
               style={{
                 flex: 1,
                 border: "none",
@@ -406,145 +392,20 @@ export default function Transactions({
             )}
           </div>
         </div>
-        {displayedTx.length === 0 ? (
-          <div
-            style={{
-              textAlign: "center",
-              color: "var(--text-muted)",
-              padding: 60,
-              fontSize: 14,
-            }}
-          >
-            Nenhum lançamento encontrado.
-          </div>
-        ) : (
-          displayedTx.map((tx) => {
-            const cat = categories.find((c) => c.id === tx.categoryId);
-            const sub = cat?.subcategories.find(
-              (s) => s.id === tx.subcategoryId,
-            );
-            return (
-              <div key={tx.id} style={{ ...S.txRow, gap: isMobile ? 10 : 14 }}>
-                {/* Ícone */}
-                <div
-                  style={{
-                    width: isMobile ? 34 : 40,
-                    height: isMobile ? 34 : 40,
-                    borderRadius: "var(--radius-md)",
-                    background: (cat?.color || "#888") + "22",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: isMobile ? 16 : 18,
-                    flexShrink: 0,
-                  }}
-                >
-                  {sub?.icon || cat?.icon}
-                </div>
-
-                {/* Descrição + badges */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: isMobile ? 13 : 14,
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap" as const,
-                    }}
-                  >
-                    {tx.description}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 6,
-                      marginTop: 4,
-                      flexWrap: "wrap" as const,
-                      alignItems: "center",
-                    }}
-                  >
-                    <span style={S.pill(cat?.color || "#888")}>
-                      {cat?.name}
-                    </span>
-                    {sub && !isMobile && (
-                      <span style={S.pill("var(--text-muted)")}>
-                        {sub.name}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {fmtDate(tx.date)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Valor */}
-                <span
-                  style={{
-                    fontWeight: 800,
-                    fontSize: isMobile ? 13 : 15,
-                    color:
-                      tx.type === "income"
-                        ? "var(--accent-green)"
-                        : "var(--accent-red)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {tx.type === "income" ? "+" : "-"}
-                  {fmt(tx.amount)}
-                </span>
-
-                {/* Editar */}
-                <button
-                  onClick={() => setEditingTx(tx)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-muted)",
-                    fontSize: 14,
-                    padding: 4,
-                    borderRadius: "var(--radius-sm)",
-                    flexShrink: 0,
-                  }}
-                  title="Editar"
-                >
-                  ✏️
-                </button>
-
-                {/* Remover */}
-                <button
-                  onClick={() => deleteTransaction(tx.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-muted)",
-                    fontSize: 14,
-                    padding: 4,
-                    borderRadius: "var(--radius-sm)",
-                    flexShrink: 0,
-                    transition: "color 0.15s",
-                  }}
-                  title="Remover"
-                >
-                  ✕
-                </button>
-              </div>
-            );
-          })
-        )}
-
-        {!hasActiveFilters && (
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            limit={limit}
-            onPageChange={onPageChange}
-          />
-        )}
+        <TransactionList
+          filteredTx={filteredTx}
+          categories={categories}
+          filterSubcategory={filterSubcategory}
+          total={total}
+          page={page}
+          totalPages={totalPages}
+          limit={limit}
+          hasActiveFilters={hasActiveFilters}
+          onEdit={setEditingTx}
+          onDelete={deleteTransaction}
+          onPageChange={onPageChange}
+          isMobile={isMobile}
+        />
       </div>
 
       {/* Modal de edição */}

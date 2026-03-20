@@ -9,6 +9,7 @@ interface UseTransactionsParams {
   type?: "income" | "expense";
   search?: string;
   limit?: number;
+  onMutate?: () => void;
 }
 
 export function useTransactions(params: UseTransactionsParams = {}) {
@@ -19,6 +20,7 @@ export function useTransactions(params: UseTransactionsParams = {}) {
   const [error, setError] = useState<string | null>(null);
 
   const limit = params.limit || 10;
+  const onMutate = params.onMutate;
 
   const fetchTransactions = useCallback(
     (targetPage = 1) => {
@@ -51,9 +53,10 @@ export function useTransactions(params: UseTransactionsParams = {}) {
     async (data: Omit<Transaction, "id" | "category" | "subcategory">) => {
       const tx = await api.createTransaction(data);
       fetchTransactions(1);
+      onMutate?.();
       return tx;
     },
-    [fetchTransactions],
+    [fetchTransactions, onMutate],
   );
 
   const updateTransaction = useCallback(
@@ -63,9 +66,10 @@ export function useTransactions(params: UseTransactionsParams = {}) {
     ) => {
       const tx = await api.updateTransaction(id, data);
       fetchTransactions(page);
+      onMutate?.();
       return tx;
     },
-    [fetchTransactions, page],
+    [fetchTransactions, page, onMutate],
   );
 
   const deleteTransaction = useCallback(
@@ -75,8 +79,9 @@ export function useTransactions(params: UseTransactionsParams = {}) {
       const newTotal = total - 1;
       const maxPage = Math.ceil(newTotal / limit);
       fetchTransactions(page > maxPage ? Math.max(1, maxPage) : page);
+      onMutate?.();
     },
-    [fetchTransactions, page, total, limit],
+    [fetchTransactions, page, total, limit, onMutate],
   );
 
   const totalPages = Math.ceil(total / limit);

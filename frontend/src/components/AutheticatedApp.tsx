@@ -65,6 +65,10 @@ export default function AuthenticatedApp() {
     refetch: refetchCategories,
   } = useCategories();
 
+  
+  // Summary — totais do mês completo (não afetado pela paginação)
+  const { summary, refetch: refetchSummary } = useSummary(filterMonth);
+
   const {
     transactions,
     total,
@@ -92,10 +96,10 @@ export default function AuthenticatedApp() {
       debouncedSearch.trim()
         ? 999
         : 10,
+        onMutate: refetchSummary,
   });
 
-  // Summary — totais do mês completo (não afetado pela paginação)
-  const { summary } = useSummary(filterMonth);
+  
 
   // ── Dados derivados ───────────────────────────────────────────────────────
 

@@ -20,7 +20,7 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
 ];
 
 export default function Header({ view, setView, setShowAddModal, onLogout }: HeaderProps) {
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [menuOpen, setMenuOpen] = useState(false);
 

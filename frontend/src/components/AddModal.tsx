@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import type { Transaction, Category } from "../lib/api";
 import { S } from "../styles";
-import EmojiPicker from "./EmojiPicker";
 
 interface AddModalProps {
   categories: Category[];

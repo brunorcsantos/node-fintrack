@@ -19,6 +19,7 @@ import swaggerUi from "@fastify/swagger-ui";
 async function main() {
   const app = Fastify({ logger: true });
 
+
   // ── Zod type provider ─────────────────────────────────────────────────────
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -87,7 +88,19 @@ async function main() {
 
   // ── Plugins ────────────────────────────────────────────────────────────────
   await app.register(cors, {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, cb) => {
+      const allowed = [
+        process.env.FRONTEND_URL || "http://localhost:5173",
+        "http://localhost:5173",
+        "http://localhost:3333",
+      ];
+      // Permite requisições sem origin (ex: Swagger UI, Postman, mobile)
+      if (!origin || allowed.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Not allowed by CORS"), false);
+      }
+    },
     credentials: true,
   });
 

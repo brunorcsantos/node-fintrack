@@ -5,7 +5,7 @@
   "main": "dist/server.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "postinstall": "prisma generate --schema=prisma/schema.prisma",
     "db:migrate": "npx prisma migrate dev --schema=prisma/schema.prisma",

@@ -1,13 +1,12 @@
 // src/views/Dashboard.tsx
 import { useState, useEffect } from "react";
 import { PieChart, Pie, Tooltip, ResponsiveContainer } from "recharts";
-import type { Category, Transaction } from "../lib/api";
+import type { Category, Transaction, Recurring } from "../lib/api";
 import type { View } from "../types";
 import { S } from "../styles";
 import { fmt, fmtDate } from "../helpers";
 import ProgressBar from "../components/ProgressBar";
 import RecurringAlerts from "../components/RecurringAlerts";
-import { useRecurring } from "../hooks/useRecurring";
 
 interface DashboardProps {
   filteredTx: Transaction[];
@@ -16,6 +15,8 @@ interface DashboardProps {
   totalExpenses: number;
   expenseByCategory: Record<string, number>;
   setView: (view: View) => void;
+  pending: Recurring[];                                                          
+  confirmRecurring: (id: string, data?: { amount?: number; date?: string }) => Promise<any>; 
 }
 
 export default function Dashboard({
@@ -25,10 +26,11 @@ export default function Dashboard({
   totalExpenses,
   expenseByCategory,
   setView,
+  pending,
+  confirmRecurring,
 }: DashboardProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
    const [dismissed, setDismissed] = useState<string[]>([]);
-  const { pending, confirmRecurring } = useRecurring();
 
   const visiblePending = pending.filter((r) => !dismissed.includes(r.id));
  

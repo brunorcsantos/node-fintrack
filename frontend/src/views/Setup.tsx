@@ -7,7 +7,6 @@ import EmojiPicker from "../components/EmojiPicker";
 import ColorPicker from "../components/ColorPicker";
 import Profile from "../components/Profile";
 import { useAuth } from "../context/AuthContext";
-import RecurringManager from "../components/RecurringManager";
 
 interface SetupProps {
   categories: Category[];
@@ -17,7 +16,7 @@ interface SetupProps {
 export default function Setup({ categories, onCategoriesChange }: SetupProps) {
   const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState<
-    "categories" | "profile" | "recurring"
+    "categories" | "profile"
   >("profile");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -190,7 +189,6 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
           [
             { key: "profile", label: "👤 Perfil" },
             { key: "categories", label: "🗂️ Categorias" },
-            { key: "recurring", label: "🔄 Recorrentes" },
           ] as const
         ).map((tab) => (
           <button
@@ -221,11 +219,6 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       {/* Tab: Perfil */}
       {activeTab === "profile" && user && (
         <Profile user={user} onUpdate={updateUser} />
-      )}
-
-      {/* Tab: Recorrentes */}
-      {activeTab === "recurring" && (
-          <RecurringManager categories={categories} />
       )}
 
       {/* Tab: Categorias */}

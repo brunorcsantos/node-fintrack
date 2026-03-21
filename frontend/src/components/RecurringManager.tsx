@@ -3,12 +3,12 @@ import { useState, useMemo } from "react";
 import type { Category, Recurring, RecurringInput } from "../lib/api";
 import { S } from "../styles";
 import { fmt } from "../helpers";
-import { useRecurring } from "../hooks/useRecurring";
-import LoadingSpinner from "./LoadingSpinner";
-import ErrorMessage from "./ErrorMessage";
 
 interface RecurringManagerProps {
   categories: Category[];
+  recurring: Recurring[];
+  onDelete: (id: string) => Promise<void>;
+  onUpdate: (id: string, data: Partial<RecurringInput>) => Promise<Recurring>;
 }
 
 const EMPTY_FORM: RecurringInput = {
@@ -21,10 +21,11 @@ const EMPTY_FORM: RecurringInput = {
   dayOfMonth: 1,
   startDate: new Date().toISOString().slice(0, 10),
   endDate: undefined,
+  mode: "indefinite",
+  installments: undefined,
 };
 
-export default function RecurringManager({ categories }: RecurringManagerProps) {
-  const { recurring, loading, error, refetch, createRecurring, updateRecurring, deleteRecurring } = useRecurring();
+export default function RecurringManager({ categories, recurring, onDelete, onUpdate }: RecurringManagerProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<RecurringInput>(EMPTY_FORM);
@@ -41,13 +42,6 @@ export default function RecurringManager({ categories }: RecurringManagerProps) 
     [categories, form.categoryId]
   );
 
-  const openCreate = () => {
-    setForm(EMPTY_FORM);
-    setEditingId(null);
-    setFormError("");
-    setShowForm(true);
-  };
-
   const openEdit = (r: Recurring) => {
     setForm({
       description: r.description,
@@ -59,6 +53,8 @@ export default function RecurringManager({ categories }: RecurringManagerProps) 
       dayOfMonth: r.dayOfMonth,
       startDate: r.startDate.slice(0, 10),
       endDate: r.endDate?.slice(0, 10),
+      mode: r.mode,
+      installments: r.installments,
     });
     setEditingId(r.id);
     setFormError("");
@@ -73,11 +69,7 @@ export default function RecurringManager({ categories }: RecurringManagerProps) 
 
     setSaving(true);
     try {
-      if (editingId) {
-        await updateRecurring(editingId, form);
-      } else {
-        await createRecurring(form);
-      }
+      if (editingId) await onUpdate(editingId, form);
       setShowForm(false);
     } catch (err: any) {
       setFormError(err.message || "Erro ao salvar.");
@@ -88,28 +80,13 @@ export default function RecurringManager({ categories }: RecurringManagerProps) 
 
   const handleDelete = async (id: string, description: string) => {
     if (!confirm(`Desativar "${description}"?`)) return;
-    await deleteRecurring(id);
+    await onDelete(id);
   };
 
   const frequencyLabel = (f: string) => f === "monthly" ? "Mensal" : "Anual";
 
-  if (loading) return <LoadingSpinner message="Carregando recorrentes..." />;
-  if (error) return <ErrorMessage message={error} onRetry={refetch} />;
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-      {/* Cabeçalho */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 14, color: "var(--text-muted)" }}>
-            {recurring.length} lançamento{recurring.length !== 1 ? "s" : ""} recorrente{recurring.length !== 1 ? "s" : ""}
-          </div>
-        </div>
-        <button style={S.btn("primary")} onClick={openCreate}>
-          + Novo Recorrente
-        </button>
-      </div>
 
       {/* Lista */}
       {recurring.length === 0 ? (

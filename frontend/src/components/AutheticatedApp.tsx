@@ -5,6 +5,7 @@ import { S } from "../styles";
 import { useCategories } from "../hooks/useCategories";
 import { useTransactions } from "../hooks/useTransactions";
 import { useSummary } from "../hooks/useSummary";
+import { useRecurring } from "../hooks/useRecurring";
 import { useAuth } from "../context/AuthContext";
 import Header from "./Header";
 import Filters from "./Filters";
@@ -65,9 +66,10 @@ export default function AuthenticatedApp() {
     refetch: refetchCategories,
   } = useCategories();
 
-  
   // Summary — totais do mês completo (não afetado pela paginação)
   const { summary, refetch: refetchSummary } = useSummary(filterMonth);
+
+  const { createRecurring, pending, confirmRecurring } = useRecurring();
 
   const {
     transactions,
@@ -96,10 +98,8 @@ export default function AuthenticatedApp() {
       debouncedSearch.trim()
         ? 999
         : 10,
-        onMutate: refetchSummary,
+    onMutate: refetchSummary,
   });
-
-  
 
   // ── Dados derivados ───────────────────────────────────────────────────────
 
@@ -152,7 +152,7 @@ export default function AuthenticatedApp() {
     },
     [addTransaction],
   );
-  
+
   return (
     <div style={{ ...S.app, minWidth: 0, overflowX: "hidden" }}>
       <Header
@@ -195,6 +195,8 @@ export default function AuthenticatedApp() {
                 totalExpenses={totalExpenses}
                 expenseByCategory={expenseByCategory}
                 setView={setView}
+                pending={pending} 
+                confirmRecurring={confirmRecurring}
               />
             )}
             {view === "transactions" && (
@@ -251,6 +253,12 @@ export default function AuthenticatedApp() {
         <AddModal
           categories={categories}
           onAdd={handleAddTransaction}
+          onAddRecurring={async (data) => {
+            // ← esta prop deve existir
+            await createRecurring(data);
+            setShowAddModal(false);
+            refetchSummary();
+          }}
           onClose={() => setShowAddModal(false)}
         />
       )}

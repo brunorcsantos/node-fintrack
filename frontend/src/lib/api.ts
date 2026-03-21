@@ -60,6 +60,8 @@ export interface Recurring {
   endDate?: string;
   active: boolean;
   lastCreatedAt?: string;
+  mode: "indefinite" | "installments";
+  installments?: number;
   categoryId: string;
   subcategoryId?: string;
   category: Category;
@@ -76,6 +78,8 @@ export type RecurringInput = {
   dayOfMonth: number;
   startDate: string;
   endDate?: string;
+  mode: "indefinite" | "installments";
+  installments?: number;
 };
 
 export interface TransactionList {

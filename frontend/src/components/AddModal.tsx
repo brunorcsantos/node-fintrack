@@ -1043,8 +1043,8 @@ export default function AddModal({
             </div>
           </div>
         )}
-      </div>
-      {/* ── MODO CARTÃO ──────────────────────────────────────────────── */}
+
+        {/* ── MODO CARTÃO ──────────────────────────────────────────────── */}
       {modalMode === "card" && !isEditing && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Seleção do cartão */}
@@ -1339,6 +1339,8 @@ export default function AddModal({
           </div>
         </div>
       )}
+      </div>
+      
     </div>
   );
 }

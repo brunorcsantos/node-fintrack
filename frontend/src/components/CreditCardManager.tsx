@@ -35,6 +35,8 @@ export default function CreditCardManager({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
+  console.log(form)
+
   const openCreate = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
@@ -298,7 +300,7 @@ export default function CreditCardManager({
                   style={S.input}
                   placeholder="Ex: Nubank, Itaú Platinum"
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, limit: e.target.value ? Number(e.target.value) : undefined })}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   autoFocus
                 />
               </div>

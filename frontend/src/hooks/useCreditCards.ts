@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from "react";
 import type {
   CreditCard,
   CreditCardInput,
-  CreditCardTransaction,
   CreditCardTransactionInput,
   CreditCardInvoice,
 } from "../lib/api";

@@ -57,7 +57,9 @@ export default function Transactions({
 }: TransactionsProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [activeTab, setActiveTab] = useState<"transactions" | "recurring">("transactions");
+  const [activeTab, setActiveTab] = useState<"transactions" | "recurring">(
+    "transactions",
+  );
   const searchRef = useRef<HTMLInputElement>(null);
   const { recurring, deleteRecurring, updateRecurring } = useRecurring();
 
@@ -129,21 +131,37 @@ export default function Transactions({
     whiteSpace: "nowrap" as const,
   });
 
-   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 12 : 16 }}>
- 
-      {/* Cabeçalho */}
-      <div style={{
+  return (
+    <div
+      style={{
         display: "flex",
-        flexDirection: isMobile ? "column" : "row" as const,
-        justifyContent: "space-between",
-        alignItems: isMobile ? "flex-start" : "center",
-        gap: 12,
-      }}>
+        flexDirection: "column",
+        gap: isMobile ? 12 : 16,
+      }}
+    >
+      {/* Cabeçalho */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : ("row" as const),
+          justifyContent: "space-between",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: 12,
+        }}
+      >
         <h2 style={{ ...S.pageTitle, fontSize: isMobile ? 18 : 22 }}>
           Lançamentos
-          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)", marginLeft: 8 }}>
-            {activeTab === "transactions" ? `${total} registros` : `${recurring.length} recorrente${recurring.length !== 1 ? "s" : ""}`}
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: "var(--text-muted)",
+              marginLeft: 8,
+            }}
+          >
+            {activeTab === "transactions"
+              ? `${total} registros`
+              : `${recurring.length} recorrente${recurring.length !== 1 ? "s" : ""}`}
           </span>
         </h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
@@ -151,31 +169,49 @@ export default function Transactions({
           <Badge color="var(--accent-red)">{fmt(totalExpenses)} despesas</Badge>
         </div>
       </div>
- 
+
       {/* Tabs */}
-      <div style={{
-        display: "flex", gap: 4,
-        background: "var(--bg-elevated)",
-        borderRadius: "var(--radius-md)",
-        padding: 4, width: "fit-content",
-      }}>
-        {([
-          { key: "transactions", label: "📋 Lançamentos" },
-          { key: "recurring", label: "🔄 Recorrentes" },
-        ] as const).map((tab) => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} style={{
-            padding: "8px 16px", borderRadius: "var(--radius-sm)",
-            border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600,
-            background: activeTab === tab.key ? "var(--bg-surface)" : "transparent",
-            color: activeTab === tab.key ? "var(--text-primary)" : "var(--text-muted)",
-            boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
-            transition: "all 0.15s",
-          }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          background: "var(--bg-elevated)",
+          borderRadius: "var(--radius-md)",
+          padding: 4,
+          width: "fit-content",
+        }}
+      >
+        {(
+          [
+            { key: "transactions", label: "📋 Lançamentos" },
+            { key: "recurring", label: "🔄 Recorrentes" },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "var(--radius-sm)",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+              background:
+                activeTab === tab.key ? "var(--bg-surface)" : "transparent",
+              color:
+                activeTab === tab.key
+                  ? "var(--text-primary)"
+                  : "var(--text-muted)",
+              boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
+              transition: "all 0.15s",
+            }}
+          >
             {tab.label}
           </button>
         ))}
       </div>
- 
+
       {/* Tab: Recorrentes */}
       {activeTab === "recurring" && (
         <RecurringManager
@@ -185,134 +221,267 @@ export default function Transactions({
           onUpdate={updateRecurring}
         />
       )}
- 
+
       {/* Tab: Lançamentos */}
-      {activeTab === "transactions" && (<>
-      <div style={{ ...S.card, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
- 
-        {/* Tipo */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
-            Tipo:
-          </span>
-          {([
-            { key: "all", label: "Todos" },
-            { key: "income", label: "💰 Receitas" },
-            { key: "expense", label: "💸 Despesas" },
-          ] as const).map((t) => (
-            <button key={t.key} style={pillActive(filterType === t.key)} onClick={() => handleTypeChange(t.key)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
- 
-        {/* Categoria */}
-        {filterType !== "all" && availableCategories.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
-              Categoria:
-            </span>
-            <button style={pillActive(filterCategoryLocal === "all")} onClick={() => handleCategoryChange("all")}>Todas</button>
-            {availableCategories.map((cat) => (
-              <button key={cat.id} style={pillActive(filterCategoryLocal === cat.id, cat.color)} onClick={() => handleCategoryChange(cat.id)}>
-                {cat.icon} {cat.name}
-              </button>
-            ))}
-          </div>
-        )}
- 
-        {/* Subcategoria */}
-        {filterCategoryLocal !== "all" && availableSubcategories.length > 0 && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const,
-            paddingLeft: 12, borderLeft: `3px solid ${selectedCategory?.color || "var(--accent-blue)"}`,
-          }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
-              Subcategoria:
-            </span>
-            <button style={pillActive(filterSubcategory === "all")} onClick={() => setFilterSubcategory("all")}>Todas</button>
-            {availableSubcategories.map((sub) => (
-              <button key={sub.id} style={pillActive(filterSubcategory === sub.id, selectedCategory?.color)} onClick={() => setFilterSubcategory(sub.id)}>
-                {sub.icon} {sub.name}
-              </button>
-            ))}
-          </div>
-        )}
- 
-        {/* Limpar filtros */}
-        {hasActiveFilters && (
-          <button
-            onClick={() => { setFilterType("all"); setFilterCategoryLocal("all"); setFilterSubcategory("all"); setSearch(""); }}
-            style={{ ...S.btn("danger"), padding: "5px 12px", fontSize: 12, alignSelf: "flex-start" as const }}
+      {activeTab === "transactions" && (
+        <>
+          <div
+            style={{
+              ...S.card,
+              padding: "14px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
           >
-            ✕ Limpar filtros
-          </button>
-        )}
-      </div>
- 
-      {/* Lista + Busca */}
-      <div style={isMobile ? S.cardMobile : S.card}>
- 
-        {/* Campo de busca — isolado para não re-renderizar com a lista */}
-        <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border-subtle)" }}>
-          <div style={{
-            display: "flex", alignItems: "center",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            padding: "0 12px", gap: 8,
-          }}>
-            <span style={{ color: "var(--text-muted)", fontSize: 14, flexShrink: 0, lineHeight: 1 }}>🔍</span>
-            <input
-              ref={searchRef}
-              autoFocus
-              type="text"
-              placeholder="Buscar por descrição ou observação..."
-              value={search}
-              onChange={(e) => {
-                const len = e.target.value.length;
-                setSearch(e.target.value);
-                requestAnimationFrame(() => {
-                  searchRef.current?.setSelectionRange(len, len);
-                });
-              }}
+            {/* Tipo */}
+            <div
               style={{
-                flex: 1, border: "none", outline: "none",
-                background: "transparent", color: "var(--text-primary)",
-                fontSize: 13, padding: "10px 0", fontFamily: "inherit",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap" as const,
               }}
-            />
-            {search && (
-              <button onClick={() => setSearch("")} style={{
-                background: "none", border: "none", color: "var(--text-muted)",
-                cursor: "pointer", fontSize: 14, padding: 2, flexShrink: 0, lineHeight: 1,
-              }}>✕</button>
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase" as const,
+                  marginRight: 4,
+                }}
+              >
+                Tipo:
+              </span>
+              {(
+                [
+                  { key: "all", label: "Todos" },
+                  { key: "income", label: "💰 Receitas" },
+                  { key: "expense", label: "💸 Despesas" },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.key}
+                  style={pillActive(filterType === t.key)}
+                  onClick={() => handleTypeChange(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Categoria */}
+            {filterType !== "all" && availableCategories.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap" as const,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--text-muted)",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase" as const,
+                    marginRight: 4,
+                  }}
+                >
+                  Categoria:
+                </span>
+                <button
+                  style={pillActive(filterCategoryLocal === "all")}
+                  onClick={() => handleCategoryChange("all")}
+                >
+                  Todas
+                </button>
+                {availableCategories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    style={pillActive(
+                      filterCategoryLocal === cat.id,
+                      cat.color,
+                    )}
+                    onClick={() => handleCategoryChange(cat.id)}
+                  >
+                    {cat.icon} {cat.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Subcategoria */}
+            {filterCategoryLocal !== "all" &&
+              availableSubcategories.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap" as const,
+                    paddingLeft: 12,
+                    borderLeft: `3px solid ${selectedCategory?.color || "var(--accent-blue)"}`,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      letterSpacing: "0.05em",
+                      textTransform: "uppercase" as const,
+                      marginRight: 4,
+                    }}
+                  >
+                    Subcategoria:
+                  </span>
+                  <button
+                    style={pillActive(filterSubcategory === "all")}
+                    onClick={() => setFilterSubcategory("all")}
+                  >
+                    Todas
+                  </button>
+                  {availableSubcategories.map((sub) => (
+                    <button
+                      key={sub.id}
+                      style={pillActive(
+                        filterSubcategory === sub.id,
+                        selectedCategory?.color,
+                      )}
+                      onClick={() => setFilterSubcategory(sub.id)}
+                    >
+                      {sub.icon} {sub.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            {/* Limpar filtros */}
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setFilterType("all");
+                  setFilterCategoryLocal("all");
+                  setFilterSubcategory("all");
+                  setSearch("");
+                }}
+                style={{
+                  ...S.btn("danger"),
+                  padding: "5px 12px",
+                  fontSize: 12,
+                  alignSelf: "flex-start" as const,
+                }}
+              >
+                ✕ Limpar filtros
+              </button>
             )}
           </div>
-        </div>
- 
-        {/* Lista de transações — componente separado para evitar re-render do input */}
-        <TransactionList
-          filteredTx={filteredTx}
-          categories={categories}
-          filterSubcategory={filterSubcategory}
-          total={total}
-          page={page}
-          totalPages={totalPages}
-          limit={limit}
-          hasActiveFilters={hasActiveFilters}
-          onEdit={setEditingTx}
-          onDelete={deleteTransaction}
-          onPageChange={onPageChange}
-          isMobile={isMobile}
-        />
-      </div>
-      </>)}
- 
+
+          {/* Lista + Busca */}
+          <div style={isMobile ? S.cardMobile : S.card}>
+            {/* Campo de busca — isolado para não re-renderizar com a lista */}
+            <div
+              style={{
+                marginBottom: 16,
+                paddingBottom: 16,
+                borderBottom: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "0 12px",
+                  gap: 8,
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--text-muted)",
+                    fontSize: 14,
+                    flexShrink: 0,
+                    lineHeight: 1,
+                  }}
+                >
+                  🔍
+                </span>
+                <input
+                  ref={searchRef}
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar por descrição ou observação..."
+                  value={search}
+                  onChange={(e) => {
+                    const len = e.target.value.length;
+                    setSearch(e.target.value);
+                    requestAnimationFrame(() => {
+                      searchRef.current?.setSelectionRange(len, len);
+                    });
+                  }}
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    outline: "none",
+                    background: "transparent",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    padding: "10px 0",
+                    fontFamily: "inherit",
+                  }}
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      padding: 2,
+                      flexShrink: 0,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Lista de transações — componente separado para evitar re-render do input */}
+            <TransactionList
+              filteredTx={filteredTx}
+              categories={categories}
+              filterSubcategory={filterSubcategory}
+              total={total}
+              page={page}
+              totalPages={totalPages}
+              limit={limit}
+              hasActiveFilters={hasActiveFilters}
+              onEdit={setEditingTx}
+              onDelete={deleteTransaction}
+              onPageChange={onPageChange}
+              isMobile={isMobile}
+            />
+          </div>
+        </>
+      )}
+
       {/* Modal de edição */}
       {editingTx && (
         <AddModal
           categories={categories}
+          cards={[]}
+          onAddCardTransaction={async () => {}}
           editingTransaction={editingTx}
           onAdd={(data) => {
             updateTransaction(editingTx.id, data);

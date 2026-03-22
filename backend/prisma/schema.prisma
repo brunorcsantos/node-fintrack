@@ -21,6 +21,10 @@ model User {
   categories   Category[]
   budgets      Budget[]
   recurring    RecurringTransaction[]
+  notifications Notification[]
+  creditCards   CreditCard[]
+  creditCardTransactions CreditCardTransaction[]
+  creditCardInvoices     CreditCardInvoice[]
 }
 
 model Category {
@@ -37,6 +41,7 @@ model Category {
   transactions  Transaction[]
   budgets       Budget[]
   recurring     RecurringTransaction[]
+  creditCardTransactions CreditCardTransaction[]
 
   @@unique([slug, userId])
 }
@@ -53,6 +58,7 @@ model Subcategory {
   transactions Transaction[]
   budgets      Budget[]
   recurring    RecurringTransaction[]
+  creditCardTransactions CreditCardTransaction[]
 
   @@unique([slug, categoryId])
 }
@@ -131,7 +137,95 @@ enum Frequency {
   yearly
 }
 
+enum NotificationType {
+  invoice_due
+  budget_alert
+  recurring_pending
+  promotion
+  custom
+}
+
+
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  read        Boolean          @default(false)
+  data        Json?
+  scheduledAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
 enum TxType {
   income
   expense
 }
+
+model CreditCard {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String                    // Ex: Nubank, Itaú
+  icon            String   @default("💳")  // Emoji do cartão
+  color           String   @default("#5A8FE8")
+  closingDay      Int                       // Dia de fechamento (1-31)
+  dueDay          Int                       // Dia de vencimento (1-31)
+  limit           Decimal? @db.Decimal(12, 2)
+  active          Boolean  @default(true)
+  notifyDaysBefore Int     @default(3)      // Dias antes do vencimento para notificar
+  createdAt       DateTime @default(now())
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    CreditCardTransaction[]
+  invoices        CreditCardInvoice[]
+
+  @@index([userId, active])
+}
+
+model CreditCardTransaction {
+  id           String     @id @default(uuid())
+  cardId       String
+  userId       String
+  description  String
+  amount       Decimal    @db.Decimal(12, 2)
+  date         DateTime                      // Data da compra
+  invoiceMonth String                        // Mês da fatura YYYY-MM
+  notes        String?
+  categoryId   String
+  subcategoryId String?
+  createdAt    DateTime   @default(now())
+
+  card         CreditCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category    @relation(fields: [categoryId], references: [id])
+  subcategory  Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([cardId, invoiceMonth])
+  @@index([userId, invoiceMonth])
+}
+
+model CreditCardInvoice {
+  id           String        @id @default(uuid())
+  cardId       String
+  userId       String
+  month        String                        // Mês da fatura YYYY-MM
+  dueDate      DateTime                      // Data de vencimento
+  totalAmount  Decimal       @db.Decimal(12, 2)
+  paid         Boolean       @default(false)
+  paidAt       DateTime?
+  transactionId String?                      // Lançamento gerado ao pagar
+  createdAt    DateTime      @default(now())
+
+  card         CreditCard    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, month])
+  @@index([userId, paid])
+}
+

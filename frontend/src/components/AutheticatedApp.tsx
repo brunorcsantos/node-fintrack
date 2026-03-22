@@ -7,6 +7,8 @@ import { useTransactions } from "../hooks/useTransactions";
 import { useSummary } from "../hooks/useSummary";
 import { useRecurring } from "../hooks/useRecurring";
 import { useAuth } from "../context/AuthContext";
+import { useNotifications } from "../hooks/useNotifications";
+import { useCreditCards } from "../hooks/useCreditCards";
 import Header from "./Header";
 import Filters from "./Filters";
 import AddModal from "./AddModal";
@@ -70,6 +72,18 @@ export default function AuthenticatedApp() {
   const { summary, refetch: refetchSummary } = useSummary(filterMonth);
 
   const { createRecurring, pending, confirmRecurring } = useRecurring();
+
+  const { upcomingInvoices, payInvoice, cards, createTransaction } =
+    useCreditCards();
+
+  const {
+    notifications,
+    unreadCount,
+    markRead,
+    markAllRead,
+    deleteNotification,
+    deleteReadNotifications,
+  } = useNotifications();
 
   const {
     transactions,
@@ -160,6 +174,12 @@ export default function AuthenticatedApp() {
         setView={setView}
         setShowAddModal={setShowAddModal}
         onLogout={logout}
+        notifications={notifications}
+        unreadCount={unreadCount}
+        onMarkRead={markRead}
+        onMarkAllRead={markAllRead}
+        onDeleteNotification={deleteNotification}
+        onDeleteReadNotifications={deleteReadNotifications}
       />
 
       <Filters
@@ -195,8 +215,10 @@ export default function AuthenticatedApp() {
                 totalExpenses={totalExpenses}
                 expenseByCategory={expenseByCategory}
                 setView={setView}
-                pending={pending} 
+                pending={pending}
                 confirmRecurring={confirmRecurring}
+                upcomingInvoices={upcomingInvoices} // ← adicionar
+                onPayInvoice={payInvoice}
               />
             )}
             {view === "transactions" && (
@@ -252,12 +274,16 @@ export default function AuthenticatedApp() {
       {showAddModal && (
         <AddModal
           categories={categories}
+          cards={cards}
           onAdd={handleAddTransaction}
           onAddRecurring={async (data) => {
-            // ← esta prop deve existir
             await createRecurring(data);
             setShowAddModal(false);
             refetchSummary();
+          }}
+          onAddCardTransaction={async (cardId, data) => {
+            await createTransaction(cardId, data);
+            setShowAddModal(false);
           }}
           onClose={() => setShowAddModal(false)}
         />

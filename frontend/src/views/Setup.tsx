@@ -7,6 +7,8 @@ import EmojiPicker from "../components/EmojiPicker";
 import ColorPicker from "../components/ColorPicker";
 import Profile from "../components/Profile";
 import { useAuth } from "../context/AuthContext";
+import CreditCardManager from "../components/CreditCardManager";
+import { useCreditCards } from "../hooks/useCreditCards";
 
 interface SetupProps {
   categories: Category[];
@@ -15,9 +17,8 @@ interface SetupProps {
 
 export default function Setup({ categories, onCategoriesChange }: SetupProps) {
   const { user, updateUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<
-    "categories" | "profile"
-  >("profile");
+  const { cards, createCard, updateCard, deleteCard } = useCreditCards();
+  const [activeTab, setActiveTab] = useState<"categories" | "profile" | "cards">("profile");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [showNewCat, setShowNewCat] = useState(false);
@@ -25,7 +26,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
   const [newCatSlug, setNewCatSlug] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("📦");
   const [newCatColor, setNewCatColor] = useState("#5A8FE8");
-  const [catError, setCatError] = useState("");
+  const [catError, setCatError] = useState("");''
   const [catLoading, setCatLoading] = useState(false);
 
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -189,6 +190,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
           [
             { key: "profile", label: "👤 Perfil" },
             { key: "categories", label: "🗂️ Categorias" },
+            { key: "cards", label: "💳 Cartões" }, 
           ] as const
         ).map((tab) => (
           <button
@@ -220,6 +222,16 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       {activeTab === "profile" && user && (
         <Profile user={user} onUpdate={updateUser} />
       )}
+
+      {/* Tab: Cartões */}
+{activeTab === "cards" && (
+  <CreditCardManager
+    cards={cards}
+    onCreate={createCard}
+    onUpdate={updateCard}
+    onDelete={deleteCard}
+  />
+)}
 
       {/* Tab: Categorias */}
       {activeTab === "categories" && (

@@ -82,6 +82,89 @@ export type RecurringInput = {
   installments?: number;
 };
 
+export interface Notification {
+  id: string;
+  userId: string;
+  type:
+    | "invoice_due"
+    | "budget_alert"
+    | "recurring_pending"
+    | "promotion"
+    | "custom";
+  title: string;
+  message: string;
+  read: boolean;
+  data?: Record<string, unknown>;
+  scheduledAt?: string;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  notifications: Notification[];
+  unreadCount: number;
+}
+
+export interface CreditCard {
+  id: string;
+  userId: string;
+  name: string;
+  icon: string;
+  color: string;
+  closingDay: number;
+  dueDay: number;
+  limit?: number;
+  active: boolean;
+  notifyDaysBefore: number;
+  createdAt: string;
+}
+
+export interface CreditCardTransaction {
+  id: string;
+  cardId: string;
+  userId: string;
+  description: string;
+  amount: number;
+  date: string;
+  invoiceMonth: string;
+  notes?: string;
+  categoryId: string;
+  subcategoryId?: string;
+  category: Category;
+  subcategory?: Subcategory;
+}
+
+export interface CreditCardInvoice {
+  id: string;
+  cardId: string;
+  userId: string;
+  month: string;
+  dueDate: string;
+  totalAmount: number;
+  paid: boolean;
+  paidAt?: string;
+  transactionId?: string;
+  card: CreditCard;
+}
+
+export type CreditCardInput = {
+  name: string;
+  icon?: string;
+  color?: string;
+  closingDay: number;
+  dueDay: number;
+  limit?: number;
+  notifyDaysBefore?: number;
+};
+
+export type CreditCardTransactionInput = {
+  description: string;
+  amount: number;
+  date: string;
+  categoryId: string;
+  subcategoryId?: string;
+  notes?: string;
+};
+
 export interface TransactionList {
   data: Transaction[];
   total: number;
@@ -343,6 +426,105 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data || {}),
     });
+  }
+
+  // Notifications
+  async getNotifications(unreadOnly = false, limit = 20) {
+    return this.request<NotificationList>(
+      `/notifications?unreadOnly=${unreadOnly}&limit=${limit}`,
+    );
+  }
+
+  async markNotificationRead(id: string) {
+    return this.request<Notification>(`/notifications/${id}/read`, {
+      method: "PUT",
+      body: JSON.stringify({}),
+    });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request<{ message: string }>("/notifications/read-all", {
+      method: "PUT",
+      body: JSON.stringify({}),
+    });
+  }
+  async deleteNotification(id: string) {
+    return this.request<void>(`/notifications/${id}`, { method: "DELETE" });
+  }
+
+  async deleteReadNotifications() {
+    return this.request<{ message: string }>("/notifications", {
+      method: "DELETE",
+    });
+  }
+
+  // Credit Cards
+  async getCreditCards() {
+    return this.request<CreditCard[]>("/credit-cards");
+  }
+
+  async createCreditCard(data: CreditCardInput) {
+    return this.request<CreditCard>("/credit-cards", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCreditCard(id: string, data: Partial<CreditCardInput>) {
+    return this.request<CreditCard>(`/credit-cards/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCreditCard(id: string) {
+    return this.request<void>(`/credit-cards/${id}`, { method: "DELETE" });
+  }
+
+  async getCreditCardTransactions(cardId: string, month?: string) {
+    const qs = month ? `?month=${month}` : "";
+    return this.request<CreditCardTransaction[]>(
+      `/credit-cards/${cardId}/transactions${qs}`,
+    );
+  }
+
+  async createCreditCardTransaction(
+    cardId: string,
+    data: CreditCardTransactionInput,
+  ) {
+    return this.request<CreditCardTransaction>(
+      `/credit-cards/${cardId}/transactions`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    );
+  }
+
+  async deleteCreditCardTransaction(cardId: string, txId: string) {
+    return this.request<void>(`/credit-cards/${cardId}/transactions/${txId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCreditCardInvoices(month?: string, unpaidOnly = false) {
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    if (unpaidOnly) qs.set("unpaidOnly", "true");
+    return this.request<CreditCardInvoice[]>(`/credit-cards/invoices?${qs}`);
+  }
+
+  async payCreditCardInvoice(
+    invoiceId: string,
+    data: { categoryId: string; subcategoryId?: string; date?: string },
+  ) {
+    return this.request<Transaction>(
+      `/credit-cards/invoices/${invoiceId}/pay`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      },
+    );
   }
 }
 

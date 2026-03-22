@@ -8,6 +8,8 @@ import { categoryRoutes } from "./routes/categories";
 import { budgetRoutes } from "./routes/budgets";
 import { profileRoutes } from "./routes/profile";
 import { recurringRoutes } from "./routes/recurring";
+import { notificationRoutes } from "./routes/notifications";
+import { creditCardRoutes } from "./routes/creditCards";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -72,6 +74,8 @@ async function main() {
         { name: "Budgets", description: "Orçamentos mensais" },
         { name: "Recurring", description: "Lançamentos recorrentes" },
         { name: "Profile", description: "Perfil do usuário" },
+        { name: "Notifications", description: "Notificações do usuário" },
+        { name: "CreditCards", description: "Cartões de crédito e faturas" },
       ],
     },
   });
@@ -104,6 +108,8 @@ async function main() {
   await app.register(budgetRoutes);
   await app.register(profileRoutes);
   await app.register(recurringRoutes);
+  await app.register(notificationRoutes);
+  await app.register(creditCardRoutes);
 
   // ── Health check ───────────────────────────────────────────────────────────
   app.get("/health", async () => ({

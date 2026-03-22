@@ -3,23 +3,42 @@ import { useState, useEffect } from "react";
 import type { View } from "../types";
 import { S } from "../styles";
 import { useTheme } from "../context/ThemeContext";
+import NotificationCenter from "./NotificationCenter";
+import type { Notification } from "../lib/api";
 
 interface HeaderProps {
   view: View;
   setView: (view: View) => void;
   setShowAddModal: (show: boolean) => void;
   onLogout: () => void;
+  notifications: Notification[];
+  unreadCount: number;
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
+  onDeleteNotification: (id: string) => void;
+  onDeleteReadNotifications: () => void;
 }
 
 const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
-  { view: "dashboard",    label: "Visão Geral",   icon: "📊" },
-  { view: "transactions", label: "Lançamentos",    icon: "📋" },
-  { view: "budgets",      label: "Orçamentos",     icon: "🎯" },
-  { view: "reports",      label: "Relatórios",     icon: "📈" },
-  { view: "setup",        label: "Configurações",  icon: "⚙️" },
+  { view: "dashboard", label: "Visão Geral", icon: "📊" },
+  { view: "transactions", label: "Lançamentos", icon: "📋" },
+  { view: "budgets", label: "Orçamentos", icon: "🎯" },
+  { view: "reports", label: "Relatórios", icon: "📈" },
+  { view: "setup", label: "Configurações", icon: "⚙️" },
 ];
 
-export default function Header({ view, setView, setShowAddModal, onLogout }: HeaderProps) {
+export default function Header({
+  view,
+  setView,
+  setShowAddModal,
+  onLogout,
+  notifications,
+  unreadCount,
+  onMarkRead,
+  onMarkAllRead,
+  onDeleteNotification,
+  onDeleteReadNotifications,
+}: HeaderProps) {
   const { toggleTheme, isDark } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -63,13 +82,22 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
         )}
 
         {/* Ações */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: isMobile ? "auto" : 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: isMobile ? "auto" : 16,
+          }}
+        >
           {/* Novo lançamento — apenas desktop */}
           {!isMobile && (
             <button
               style={{
                 ...S.btn("primary"),
-                display: "flex", alignItems: "center", gap: 6,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
               onClick={() => setShowAddModal(true)}
             >
@@ -78,18 +106,31 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
             </button>
           )}
 
+          {/* Centro de notificações */}
+          <NotificationCenter
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onMarkRead={onMarkRead}
+            onMarkAllRead={onMarkAllRead}
+            onDelete={onDeleteNotification}
+            onDeleteRead={onDeleteReadNotifications}
+          />
+
           {/* Toggle tema */}
           <button
             onClick={toggleTheme}
             title={isDark ? "Modo claro" : "Modo escuro"}
             style={{
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               borderRadius: "var(--radius-md)",
               border: "1px solid var(--border-default)",
               background: "transparent",
               cursor: "pointer",
               fontSize: 16,
-              display: "flex", alignItems: "center", justifyContent: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               color: "var(--text-secondary)",
               transition: "all 0.15s",
             }}
@@ -103,13 +144,16 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
               onClick={onLogout}
               title="Sair"
               style={{
-                width: 36, height: 36,
+                width: 36,
+                height: 36,
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border-default)",
                 background: "transparent",
                 cursor: "pointer",
                 fontSize: 16,
-                display: "flex", alignItems: "center", justifyContent: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 color: "var(--text-muted)",
                 transition: "all 0.15s",
               }}
@@ -123,13 +167,16 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
             <button
               onClick={() => setMenuOpen((o) => !o)}
               style={{
-                width: 36, height: 36,
+                width: 36,
+                height: 36,
                 borderRadius: "var(--radius-md)",
                 border: "1px solid var(--border-default)",
                 background: "transparent",
                 cursor: "pointer",
                 fontSize: 18,
-                display: "flex", alignItems: "center", justifyContent: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 color: "var(--text-secondary)",
               }}
             >
@@ -141,18 +188,20 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
 
       {/* Menu mobile dropdown */}
       {isMobile && menuOpen && (
-        <div style={{
-          background: "var(--bg-surface)",
-          borderBottom: "1px solid var(--border-subtle)",
-          padding: "8px 16px 16px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          boxShadow: "var(--shadow-md)",
-          position: "sticky" as const,
-          top: 60,
-          zIndex: 99,
-        }}>
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            borderBottom: "1px solid var(--border-subtle)",
+            padding: "8px 16px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            boxShadow: "var(--shadow-md)",
+            position: "sticky" as const,
+            top: 60,
+            zIndex: 99,
+          }}
+        >
           {NAV_ITEMS.map((item) => (
             <button
               key={item.view}
@@ -168,7 +217,8 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                background: view === item.view ? "var(--accent-blue)" : "transparent",
+                background:
+                  view === item.view ? "var(--accent-blue)" : "transparent",
                 color: view === item.view ? "#ffffff" : "var(--text-secondary)",
                 transition: "all 0.15s",
               }}
@@ -178,10 +228,19 @@ export default function Header({ view, setView, setShowAddModal, onLogout }: Hea
             </button>
           ))}
 
-          <div style={{ height: 1, background: "var(--border-subtle)", margin: "8px 0" }} />
+          <div
+            style={{
+              height: 1,
+              background: "var(--border-subtle)",
+              margin: "8px 0",
+            }}
+          />
 
           <button
-            onClick={() => { setShowAddModal(true); setMenuOpen(false); }}
+            onClick={() => {
+              setShowAddModal(true);
+              setMenuOpen(false);
+            }}
             style={{
               ...S.btn("primary"),
               width: "100%",

@@ -4,7 +4,6 @@ import type {
   Category,
   Transaction,
   CreditCard,
-  CreditCardInvoice,
 } from "../lib/api";
 import { S } from "../styles";
 import { fmt } from "../helpers";

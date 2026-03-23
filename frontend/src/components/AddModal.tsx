@@ -41,7 +41,6 @@ export default function AddModal({
   categories,
   onAdd,
   cards,
-  onAddRecurring,
   onAddCardTransaction,
   onClose,
   editingTransaction,

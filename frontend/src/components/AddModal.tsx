@@ -50,7 +50,9 @@ export default function AddModal({
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // ── Modo do modal ─────────────────────────────────────────────────────────
-  const [modalMode, setModalMode] = useState<"single" | "recurring" | "card">("single");
+  const [modalMode, setModalMode] = useState<"single" | "recurring" | "card">(
+    "single",
+  );
   const [selectedCardId, setSelectedCardId] = useState("");
 
   // ── Lançamento único ──────────────────────────────────────────────────────
@@ -151,62 +153,61 @@ export default function AddModal({
       }
     }
 
-    
+    setSaving(true);
+    try {
+      await onAddCardTransaction(selectedCardId, {
+        description,
+        amount: parseFloat(amount),
+        date,
+        categoryId: effectiveCategoryId,
+        subcategoryId: subcategoryId || undefined,
+        notes,
+      });
+      onClose();
+    } catch (err: any) {
+      setError(err.message || "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-      setSaving(true);
-      try {
-        await onAddCardTransaction(selectedCardId, {
-          description,
-          amount: parseFloat(amount),
-          date,
-          categoryId: effectiveCategoryId,
-          subcategoryId: subcategoryId || undefined,
-          notes,
-        });
-        onClose();
-      } catch (err: any) {
-        setError(err.message || "Erro ao salvar.");
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const handleSubmitCard = async () => {
-      setError("");
-      if (!selectedCardId) {
-        setError("Selecione um cartão.");
-        return;
-      }
-      if (!description.trim()) {
-        setError("Informe a descrição.");
-        return;
-      }
-      if (!amount) {
-        setError("Informe o valor.");
-        return;
-      }
-      if (!date) {
-        setError("Informe a data.");
-        return;
-      }
-      if (!effectiveCategoryId) {
-        setError("Selecione uma categoria.");
-        return;
-      }
+  const handleSubmitCard = async () => {
+    setError("");
+    if (!selectedCardId) {
+      setError("Selecione um cartão.");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Informe a descrição.");
+      return;
+    }
+    if (!amount) {
+      setError("Informe o valor.");
+      return;
+    }
+    if (!date) {
+      setError("Informe a data.");
+      return;
+    }
+    if (!effectiveCategoryId) {
+      setError("Selecione uma categoria.");
+      return;
+    }
 
     setSaving(true);
     try {
-      const payload: RecurringInput = {
-        ...recurring,
-        amount:
-          recurring.amount && recurring.amount > 0
-            ? recurring.amount
-            : undefined,
-      };
-      await onAddRecurring(payload);
+      await onAddCardTransaction(selectedCardId, {
+        // ← correto
+        description,
+        amount: parseFloat(amount),
+        date,
+        categoryId: effectiveCategoryId,
+        subcategoryId: subcategoryId || undefined,
+        notes,
+      });
       onClose();
     } catch (err: any) {
-      setError(err.message || "Erro ao salvar recorrente.");
+      setError(err.message || "Erro ao salvar.");
     } finally {
       setSaving(false);
     }
@@ -232,8 +233,6 @@ export default function AddModal({
     transition: "all 0.15s",
     whiteSpace: "nowrap" as const,
   });
-
-  
 
   return (
     <div style={S.modal} onClick={onClose}>
@@ -1045,208 +1044,182 @@ export default function AddModal({
         )}
 
         {/* ── MODO CARTÃO ──────────────────────────────────────────────── */}
-      {modalMode === "card" && !isEditing && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Seleção do cartão */}
-          <div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 8,
-                fontWeight: 600,
-              }}
-            >
-              Cartão *
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {cards.length === 0 ? (
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "var(--text-muted)",
-                    padding: "12px",
-                    background: "var(--bg-elevated)",
-                    borderRadius: "var(--radius-md)",
-                  }}
-                >
-                  Nenhum cartão cadastrado. Adicione um em Configurações → 💳
-                  Cartões.
-                </div>
-              ) : (
-                cards.map((card) => (
-                  <button
-                    key={card.id}
-                    onClick={() => setSelectedCardId(card.id)}
+        {modalMode === "card" && !isEditing && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Seleção do cartão */}
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 8,
+                  fontWeight: 600,
+                }}
+              >
+                Cartão *
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {cards.length === 0 ? (
+                  <div
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "10px 14px",
+                      fontSize: 13,
+                      color: "var(--text-muted)",
+                      padding: "12px",
+                      background: "var(--bg-elevated)",
                       borderRadius: "var(--radius-md)",
-                      border: "2px solid",
-                      borderColor:
-                        selectedCardId === card.id
-                          ? card.color
-                          : "var(--border-default)",
-                      background:
-                        selectedCardId === card.id
-                          ? card.color + "11"
-                          : "transparent",
-                      cursor: "pointer",
-                      transition: "all 0.15s",
-                      textAlign: "left" as const,
                     }}
                   >
-                    <span style={{ fontSize: 20 }}>{card.icon}</span>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "var(--text-primary)",
-                        }}
-                      >
-                        {card.name}
+                    Nenhum cartão cadastrado. Adicione um em Configurações → 💳
+                    Cartões.
+                  </div>
+                ) : (
+                  cards.map((card) => (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedCardId(card.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: "10px 14px",
+                        borderRadius: "var(--radius-md)",
+                        border: "2px solid",
+                        borderColor:
+                          selectedCardId === card.id
+                            ? card.color
+                            : "var(--border-default)",
+                        background:
+                          selectedCardId === card.id
+                            ? card.color + "11"
+                            : "transparent",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                        textAlign: "left" as const,
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{card.icon}</span>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          {card.name}
+                        </div>
+                        <div
+                          style={{ fontSize: 11, color: "var(--text-muted)" }}
+                        >
+                          Fecha dia {card.closingDay} · Vence dia {card.dueDay}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                        Fecha dia {card.closingDay} · Vence dia {card.dueDay}
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Descrição */}
-          <div>
+            {/* Descrição */}
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 6,
+                  fontWeight: 600,
+                }}
+              >
+                Descrição *
+              </div>
+              <input
+                style={S.input}
+                placeholder="Ex: Compras no Mercado Livre"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            {/* Valor + Data */}
             <div
               style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 6,
-                fontWeight: 600,
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
               }}
             >
-              Descrição *
-            </div>
-            <input
-              style={S.input}
-              placeholder="Ex: Compras no Mercado Livre"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-
-          {/* Valor + Data */}
-          <div
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
-                Valor (R$) *
-              </div>
-              <input
-                style={S.input}
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0,00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
-                Data da compra *
-              </div>
-              <input
-                style={S.input}
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Aviso de fatura */}
-          {selectedCardId &&
-            date &&
-            (() => {
-              const card = cards.find((c) => c.id === selectedCardId);
-              if (!card) return null;
-              const purchaseDay = new Date(
-                date + "T12:00:00.000Z",
-              ).getUTCDate();
-              const nextMonth = purchaseDay > card.closingDay;
-              return (
+              <div>
                 <div
                   style={{
-                    background: nextMonth
-                      ? "var(--accent-orange, #E8C45A)15"
-                      : "var(--accent-green)15",
-                    border: `1px solid ${nextMonth ? "var(--accent-orange, #E8C45A)" : "var(--accent-green)"}44`,
-                    borderRadius: "var(--radius-md)",
-                    padding: "10px 14px",
                     fontSize: 12,
-                    color: "var(--text-secondary)",
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                    fontWeight: 600,
                   }}
                 >
-                  {nextMonth
-                    ? `⚠️ Compra após o fechamento (dia ${card.closingDay}) — será lançada na fatura do próximo mês`
-                    : `✅ Será lançada na fatura do mês atual (fecha dia ${card.closingDay})`}
+                  Valor (R$) *
                 </div>
-              );
-            })()}
-
-          {/* Categoria */}
-          <div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 6,
-                fontWeight: 600,
-              }}
-            >
-              Categoria
+                <input
+                  style={S.input}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0,00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  Data da compra *
+                </div>
+                <input
+                  style={S.input}
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+              </div>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}>
-              {categories
-                .filter((c) => c.slug !== "receita")
-                .map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setCategoryId(c.id);
-                      setSubcategoryId("");
+
+            {/* Aviso de fatura */}
+            {selectedCardId &&
+              date &&
+              (() => {
+                const card = cards.find((c) => c.id === selectedCardId);
+                if (!card) return null;
+                const purchaseDay = new Date(
+                  date + "T12:00:00.000Z",
+                ).getUTCDate();
+                const nextMonth = purchaseDay > card.closingDay;
+                return (
+                  <div
+                    style={{
+                      background: nextMonth
+                        ? "var(--accent-orange, #E8C45A)15"
+                        : "var(--accent-green)15",
+                      border: `1px solid ${nextMonth ? "var(--accent-orange, #E8C45A)" : "var(--accent-green)"}44`,
+                      borderRadius: "var(--radius-md)",
+                      padding: "10px 14px",
+                      fontSize: 12,
+                      color: "var(--text-secondary)",
                     }}
-                    style={pillStyle(effectiveCategoryId === c.id, c.color)}
                   >
-                    <span>{c.icon}</span>
-                    <span>{c.name}</span>
-                  </button>
-                ))}
-            </div>
-          </div>
+                    {nextMonth
+                      ? `⚠️ Compra após o fechamento (dia ${card.closingDay}) — será lançada na fatura do próximo mês`
+                      : `✅ Será lançada na fatura do mês atual (fecha dia ${card.closingDay})`}
+                  </div>
+                );
+              })()}
 
-          {/* Subcategoria */}
-          {cat && cat.subcategories.length > 0 && (
+            {/* Categoria */}
             <div>
               <div
                 style={{
@@ -1256,91 +1229,124 @@ export default function AddModal({
                   fontWeight: 600,
                 }}
               >
-                Subcategoria
+                Categoria
               </div>
               <div
-                style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}
+                style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}
               >
-                <button
-                  onClick={() => setSubcategoryId("")}
-                  style={pillStyle(!subcategoryId)}
-                >
-                  Todas
-                </button>
-                {cat.subcategories.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSubcategoryId(s.id)}
-                    style={pillStyle(subcategoryId === s.id)}
-                  >
-                    <span>{s.icon}</span>
-                    <span>{s.name}</span>
-                  </button>
-                ))}
+                {categories
+                  .filter((c) => c.slug !== "receita")
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setCategoryId(c.id);
+                        setSubcategoryId("");
+                      }}
+                      style={pillStyle(effectiveCategoryId === c.id, c.color)}
+                    >
+                      <span>{c.icon}</span>
+                      <span>{c.name}</span>
+                    </button>
+                  ))}
               </div>
             </div>
-          )}
 
-          {/* Observações */}
-          <div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--text-muted)",
-                marginBottom: 6,
-                fontWeight: 600,
-              }}
-            >
-              Observações
+            {/* Subcategoria */}
+            {cat && cat.subcategories.length > 0 && (
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    marginBottom: 6,
+                    fontWeight: 600,
+                  }}
+                >
+                  Subcategoria
+                </div>
+                <div
+                  style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}
+                >
+                  <button
+                    onClick={() => setSubcategoryId("")}
+                    style={pillStyle(!subcategoryId)}
+                  >
+                    Todas
+                  </button>
+                  {cat.subcategories.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSubcategoryId(s.id)}
+                      style={pillStyle(subcategoryId === s.id)}
+                    >
+                      <span>{s.icon}</span>
+                      <span>{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Observações */}
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-muted)",
+                  marginBottom: 6,
+                  fontWeight: 600,
+                }}
+              >
+                Observações
+              </div>
+              <input
+                style={S.input}
+                placeholder="Opcional..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
             </div>
-            <input
-              style={S.input}
-              placeholder="Opcional..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
 
-          {/* Erro */}
-          {error && (
-            <div
-              style={{
-                background: "var(--accent-red)15",
-                border: "1px solid var(--accent-red)44",
-                borderRadius: "var(--radius-md)",
-                padding: "10px 14px",
-                fontSize: 13,
-                color: "var(--accent-red)",
-                display: "flex",
-                gap: 8,
-              }}
-            >
-              <span>⚠️</span>
-              <span>{error}</span>
+            {/* Erro */}
+            {error && (
+              <div
+                style={{
+                  background: "var(--accent-red)15",
+                  border: "1px solid var(--accent-red)44",
+                  borderRadius: "var(--radius-md)",
+                  padding: "10px 14px",
+                  fontSize: 13,
+                  color: "var(--accent-red)",
+                  display: "flex",
+                  gap: 8,
+                }}
+              >
+                <span>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Ações */}
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button style={{ ...S.btn("ghost"), flex: 1 }} onClick={onClose}>
+                Cancelar
+              </button>
+              <button
+                style={{
+                  ...S.btn("primary"),
+                  flex: 2,
+                  opacity: saving ? 0.7 : 1,
+                }}
+                onClick={handleSubmitCard}
+                disabled={saving || cards.length === 0}
+              >
+                {saving ? "Salvando..." : "💳 Lançar no Cartão"}
+              </button>
             </div>
-          )}
-
-          {/* Ações */}
-          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-            <button style={{ ...S.btn("ghost"), flex: 1 }} onClick={onClose}>
-              Cancelar
-            </button>
-            <button
-              style={{
-                ...S.btn("primary"),
-                flex: 2,
-                opacity: saving ? 0.7 : 1,
-              }}
-              onClick={handleSubmitCard}
-              disabled={saving || cards.length === 0}
-            >
-              {saving ? "Salvando..." : "💳 Lançar no Cartão"}
-            </button>
           </div>
-        </div>
-      )}
+        )}
       </div>
-      
     </div>
   );
 }

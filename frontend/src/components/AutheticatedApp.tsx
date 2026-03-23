@@ -73,8 +73,13 @@ export default function AuthenticatedApp() {
 
   const { createRecurring, pending, confirmRecurring } = useRecurring();
 
-  const { upcomingInvoices, payInvoice, cards, createTransaction } =
-    useCreditCards();
+  const {
+    upcomingInvoices,
+    payInvoice,
+    cards,
+    createTransaction,
+    deleteTransaction: deleteCardTransaction,
+  } = useCreditCards();
 
   const {
     notifications,
@@ -172,7 +177,6 @@ export default function AuthenticatedApp() {
       <Header
         view={view}
         setView={setView}
-        setShowAddModal={setShowAddModal}
         onLogout={logout}
         notifications={notifications}
         unreadCount={unreadCount}
@@ -246,8 +250,12 @@ export default function AuthenticatedApp() {
                 setFilterCategoryLocal={setFilterCategoryLocal}
                 filterSubcategory={filterSubcategory}
                 setFilterSubcategory={setFilterSubcategory}
-                search={search} // ← search (para exibir no input)
-                setSearch={setSearch} // ← setSearch (para atualizar ao digitar)
+                search={search}
+                setSearch={setSearch}
+                cards={cards}
+                onPayInvoice={payInvoice}
+                onDeleteCardTransaction={deleteCardTransaction}
+                onAddNew={() => setShowAddModal(true)}
               />
             )}
             {view === "budgets" && (

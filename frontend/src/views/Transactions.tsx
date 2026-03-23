@@ -1,12 +1,18 @@
 // src/views/Transactions.tsx
 import { useState, useEffect, useMemo, useRef } from "react";
-import type { Category, Transaction } from "../lib/api";
+import type {
+  Category,
+  Transaction,
+  CreditCard,
+  CreditCardInvoice,
+} from "../lib/api";
 import { S } from "../styles";
 import { fmt } from "../helpers";
 import Badge from "../components/Badge";
 import AddModal from "../components/AddModal";
 import TransactionList from "../components/TransactionList";
 import RecurringManager from "../components/RecurringManager";
+import CreditCardStatement from "../components/CreditCardStatement";
 import { useRecurring } from "../hooks/useRecurring";
 
 interface TransactionsProps {
@@ -32,6 +38,13 @@ interface TransactionsProps {
   setFilterSubcategory: (id: string) => void;
   search: string;
   setSearch: (s: string) => void;
+  cards: CreditCard[];
+  onAddNew: () => void;
+  onPayInvoice: (
+    invoiceId: string,
+    data: { categoryId: string; subcategoryId?: string; date?: string },
+  ) => Promise<any>;
+  onDeleteCardTransaction: (cardId: string, txId: string) => Promise<void>;
 }
 
 export default function Transactions({
@@ -54,12 +67,16 @@ export default function Transactions({
   setFilterSubcategory,
   search,
   setSearch,
+  cards,
+  onPayInvoice,
+  onDeleteCardTransaction,
+  onAddNew,
 }: TransactionsProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [activeTab, setActiveTab] = useState<"transactions" | "recurring">(
-    "transactions",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "transactions" | "recurring" | "cards"
+  >("transactions");
   const searchRef = useRef<HTMLInputElement>(null);
   const { recurring, deleteRecurring, updateRecurring } = useRecurring();
 
@@ -170,46 +187,72 @@ export default function Transactions({
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs + Botão */}
       <div
         style={{
           display: "flex",
-          gap: 4,
-          background: "var(--bg-elevated)",
-          borderRadius: "var(--radius-md)",
-          padding: 4,
-          width: "fit-content",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap" as const,
+          gap: 8,
         }}
       >
-        {(
-          [
-            { key: "transactions", label: "📋 Lançamentos" },
-            { key: "recurring", label: "🔄 Recorrentes" },
-          ] as const
-        ).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "var(--radius-sm)",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-              background:
-                activeTab === tab.key ? "var(--bg-surface)" : "transparent",
-              color:
-                activeTab === tab.key
-                  ? "var(--text-primary)"
-                  : "var(--text-muted)",
-              boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
-              transition: "all 0.15s",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {/* Tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            background: "var(--bg-elevated)",
+            borderRadius: "var(--radius-md)",
+            padding: 4,
+            width: "fit-content",
+          }}
+        >
+          {(
+            [
+              { key: "transactions", label: "📋 Lançamentos" },
+              { key: "recurring", label: "🔄 Recorrentes" },
+              { key: "cards", label: "💳 Cartões" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "var(--radius-sm)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+                background:
+                  activeTab === tab.key ? "var(--bg-surface)" : "transparent",
+                color:
+                  activeTab === tab.key
+                    ? "var(--text-primary)"
+                    : "var(--text-muted)",
+                boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
+                transition: "all 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Botão Novo Lançamento */}
+        <button
+          style={{
+            ...S.btn("primary"),
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+          onClick={onAddNew}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+          {!isMobile && "Novo Lançamento"}
+        </button>
       </div>
 
       {/* Tab: Recorrentes */}
@@ -219,6 +262,16 @@ export default function Transactions({
           recurring={recurring}
           onDelete={deleteRecurring}
           onUpdate={updateRecurring}
+        />
+      )}
+
+      {/* Tab: Cartões */}
+      {activeTab === "cards" && (
+        <CreditCardStatement
+          cards={cards}
+          categories={categories}
+          onPayInvoice={onPayInvoice}
+          onDeleteTransaction={onDeleteCardTransaction}
         />
       )}
 

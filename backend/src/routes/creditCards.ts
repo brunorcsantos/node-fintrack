@@ -71,6 +71,7 @@ export async function creditCardRoutes(app: FastifyInstance) {
     schema: { tags: ["CreditCards"], summary: "Criar cartão", security, body: cardSchema },
     onRequest: [authenticate],
   }, async (req, reply) => {
+    console.log("body recebido:", req.body);
     const { sub: userId } = req.user as { sub: string };
     const parsed = cardSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });

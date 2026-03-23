@@ -9,7 +9,6 @@ import type { Notification } from "../lib/api";
 interface HeaderProps {
   view: View;
   setView: (view: View) => void;
-  setShowAddModal: (show: boolean) => void;
   onLogout: () => void;
   notifications: Notification[];
   unreadCount: number;
@@ -30,7 +29,6 @@ const NAV_ITEMS: { view: View; label: string; icon: string }[] = [
 export default function Header({
   view,
   setView,
-  setShowAddModal,
   onLogout,
   notifications,
   unreadCount,
@@ -91,7 +89,7 @@ export default function Header({
           }}
         >
           {/* Novo lançamento — apenas desktop */}
-          {!isMobile && (
+          {/* {!isMobile && (
             <button
               style={{
                 ...S.btn("primary"),
@@ -104,7 +102,7 @@ export default function Header({
               <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
               Novo Lançamento
             </button>
-          )}
+          )} */}
 
           {/* Centro de notificações */}
           <NotificationCenter
@@ -236,7 +234,7 @@ export default function Header({
             }}
           />
 
-          <button
+          {/* <button
             onClick={() => {
               setShowAddModal(true);
               setMenuOpen(false);
@@ -252,7 +250,7 @@ export default function Header({
             }}
           >
             + Novo Lançamento
-          </button>
+          </button> */}
 
           <button
             onClick={onLogout}

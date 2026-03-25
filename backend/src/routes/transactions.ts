@@ -45,7 +45,7 @@ export async function transactionRoutes(app: FastifyInstance) {
       const { sub: userId } = req.user as { sub: string };
       const query = listSchema.parse(req.query);
 
-      const where: any = { userId };
+      const where: Record<string, unknown> = { userId };
 
       if (query.month) {
         const [year, month] = query.month.split("-").map(Number);
@@ -56,8 +56,14 @@ export async function transactionRoutes(app: FastifyInstance) {
       }
       if (query.categoryId) where.categoryId = query.categoryId;
       if (query.type) where.type = query.type;
+
+      // CORREÇÃO: busca também nas `notes`, não só na `description`.
+      // CORREÇÃO: removidos os console.log que vazavam dados de query em produção.
       if (query.search) {
-        where.description = { contains: query.search, mode: "insensitive" };
+        where.OR = [
+          { description: { contains: query.search, mode: "insensitive" } },
+          { notes: { contains: query.search, mode: "insensitive" } },
+        ];
       }
 
       const [data, total] = await Promise.all([
@@ -70,8 +76,7 @@ export async function transactionRoutes(app: FastifyInstance) {
         }),
         prisma.transaction.count({ where }),
       ]);
-      console.log("query:", query);
-      console.log("where:", where);
+
       return { data, total, page: query.page, limit: query.limit };
     },
   );
@@ -170,7 +175,7 @@ export async function transactionRoutes(app: FastifyInstance) {
     },
   );
 
-  // GET /transactions/summary — aggregated data for charts
+  // GET /transactions/summary
   app.get(
     "/transactions/summary",
     {
@@ -188,7 +193,7 @@ export async function transactionRoutes(app: FastifyInstance) {
       const { sub: userId } = req.user as { sub: string };
       const { month } = req.query as { month?: string };
 
-      const where: any = { userId };
+      const where: Record<string, unknown> = { userId };
       if (month) {
         const [year, m] = month.split("-").map(Number);
         where.date = {
@@ -198,35 +203,19 @@ export async function transactionRoutes(app: FastifyInstance) {
       }
 
       const [byCategory, totals, monthly] = await Promise.all([
-        // Sum by category — respeita filtro de mês
         prisma.transaction.groupBy({
           by: ["categoryId", "type"],
           where,
           _sum: { amount: true },
         }),
-        // Total income / expense — respeita filtro de mês
         prisma.transaction.groupBy({
           by: ["type"],
           where,
           _sum: { amount: true },
         }),
-        // Evolução mensal — sempre últimos 6 meses, filtrado por userId
-        prisma.transaction
-          .groupBy({
-            by: ["type"],
-            where: {
-              userId,
-              date: {
-                gte: new Date(new Date().setMonth(new Date().getMonth() - 5)),
-              },
-            },
-            _sum: { amount: true },
-          })
-          .then(async () => {
-            // Busca agrupada por mês usando Prisma
-            const results = await prisma.$queryRaw<
-              { month: string; type: string; total: number }[]
-            >`
+        prisma.$queryRaw<
+          { month: string; type: string; total: number }[]
+        >`
           SELECT
             TO_CHAR(date, 'YYYY-MM') as month,
             type,
@@ -236,10 +225,7 @@ export async function transactionRoutes(app: FastifyInstance) {
             AND date >= DATE_TRUNC('month', NOW()) - INTERVAL '5 months'
           GROUP BY month, type
           ORDER BY month ASC
-        `;
-
-            return results;
-          }),
+        `,
       ]);
 
       return { byCategory, totals, monthly };

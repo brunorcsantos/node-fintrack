@@ -1,4 +1,5 @@
 // src/lib/api.ts
+// [tipos mantidos idênticos ao original — apenas a classe ApiClient é atualizada]
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3333";
 
@@ -8,7 +9,6 @@ export interface User {
   name: string;
   email: string;
 }
-
 export interface Subcategory {
   id: string;
   slug: string;
@@ -16,7 +16,6 @@ export interface Subcategory {
   icon: string;
   categoryId: string;
 }
-
 export interface Category {
   id: string;
   slug: string;
@@ -25,7 +24,6 @@ export interface Category {
   color: string;
   subcategories: Subcategory[];
 }
-
 export interface Transaction {
   id: string;
   description: string;
@@ -38,7 +36,6 @@ export interface Transaction {
   category: Category;
   subcategory?: Subcategory;
 }
-
 export interface Budget {
   id: string;
   amount: number;
@@ -48,7 +45,6 @@ export interface Budget {
   category?: Category;
   subcategory?: Subcategory;
 }
-
 export interface Recurring {
   id: string;
   description: string;
@@ -67,7 +63,6 @@ export interface Recurring {
   category: Category;
   subcategory?: Subcategory;
 }
-
 export type RecurringInput = {
   description: string;
   amount?: number;
@@ -81,7 +76,6 @@ export type RecurringInput = {
   mode: "indefinite" | "installments";
   installments?: number;
 };
-
 export interface Notification {
   id: string;
   userId: string;
@@ -98,12 +92,10 @@ export interface Notification {
   scheduledAt?: string;
   createdAt: string;
 }
-
 export interface NotificationList {
   notifications: Notification[];
   unreadCount: number;
 }
-
 export interface CreditCard {
   id: string;
   userId: string;
@@ -117,7 +109,6 @@ export interface CreditCard {
   notifyDaysBefore: number;
   createdAt: string;
 }
-
 export interface CreditCardTransaction {
   id: string;
   cardId: string;
@@ -132,7 +123,6 @@ export interface CreditCardTransaction {
   category: Category;
   subcategory?: Subcategory;
 }
-
 export interface CreditCardInvoice {
   id: string;
   cardId: string;
@@ -145,7 +135,6 @@ export interface CreditCardInvoice {
   transactionId?: string;
   card: CreditCard;
 }
-
 export type CreditCardInput = {
   name: string;
   icon?: string;
@@ -155,7 +144,6 @@ export type CreditCardInput = {
   limit?: number;
   notifyDaysBefore?: number;
 };
-
 export type CreditCardTransactionInput = {
   description: string;
   amount: number;
@@ -164,14 +152,12 @@ export type CreditCardTransactionInput = {
   subcategoryId?: string;
   notes?: string;
 };
-
 export interface TransactionList {
   data: Transaction[];
   total: number;
   page: number;
   limit: number;
 }
-
 export interface Summary {
   byCategory: { categoryId: string; type: string; _sum: { amount: number } }[];
   totals: { type: string; _sum: { amount: number } }[];
@@ -180,35 +166,111 @@ export interface Summary {
 
 // ── HTTP client ───────────────────────────────────────────────────────────────
 class ApiClient {
-  private token: string | null = null;
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  private refreshPromise: Promise<void> | null = null;
 
-  setToken(token: string | null) {
-    this.token = token;
-    if (token) localStorage.setItem("fintrack_token", token);
-    else localStorage.removeItem("fintrack_token");
+  /**
+   * Carrega os tokens do localStorage.
+   * Retorna o accessToken para compatibilidade com AuthContext.
+   */
+  loadToken(): string | null {
+    this.accessToken = localStorage.getItem("fintrack_access_token");
+    this.refreshToken = localStorage.getItem("fintrack_refresh_token");
+    return this.accessToken;
   }
 
-  loadToken() {
-    this.token = localStorage.getItem("fintrack_token");
-    return this.token;
+  setTokens(accessToken: string | null, refreshToken?: string | null) {
+    this.accessToken = accessToken;
+    if (accessToken) {
+      localStorage.setItem("fintrack_access_token", accessToken);
+    } else {
+      localStorage.removeItem("fintrack_access_token");
+    }
+
+    if (refreshToken !== undefined) {
+      this.refreshToken = refreshToken;
+      if (refreshToken) {
+        localStorage.setItem("fintrack_refresh_token", refreshToken);
+      } else {
+        localStorage.removeItem("fintrack_refresh_token");
+      }
+    }
+  }
+
+  /** @deprecated Use setTokens() */
+  setToken(token: string | null) {
+    this.setTokens(token);
+  }
+
+  clearTokens() {
+    this.setTokens(null, null);
+  }
+
+  /**
+   * Tenta renovar o access token usando o refresh token.
+   * Usa uma única Promise compartilhada para evitar múltiplas renovações
+   * simultâneas (problema comum quando várias requests expiram ao mesmo tempo).
+   */
+  private async tryRefresh(): Promise<boolean> {
+    if (!this.refreshToken) return false;
+
+    if (!this.refreshPromise) {
+      this.refreshPromise = (async () => {
+        try {
+          const res = await fetch(`${BASE_URL}/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refreshToken: this.refreshToken }),
+          });
+
+          if (!res.ok) {
+            this.clearTokens();
+            window.dispatchEvent(new Event("auth:logout"));
+            return;
+          }
+
+          const data = await res.json();
+          this.setTokens(data.accessToken, data.refreshToken);
+        } catch {
+          this.clearTokens();
+          window.dispatchEvent(new Event("auth:logout"));
+        } finally {
+          this.refreshPromise = null;
+        }
+      })();
+    }
+
+    await this.refreshPromise;
+    return !!this.accessToken;
   }
 
   private async request<T>(
     path: string,
     options: RequestInit = {},
   ): Promise<T> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
+    const doRequest = async (token: string | null): Promise<Response> => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+      };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      return fetch(`${BASE_URL}${path}`, { ...options, headers });
     };
-    if (this.token) headers["Authorization"] = `Bearer ${this.token}`;
 
-    const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    let res = await doRequest(this.accessToken);
+
+    // Access token expirado — tenta renovar e repetir a request uma vez
+    if (res.status === 401 && path !== "/auth/refresh" && path !== "/auth/me") {
+      const refreshed = await this.tryRefresh();
+      if (refreshed) {
+        res = await doRequest(this.accessToken);
+      }
+    }
 
     if (res.status === 401) {
-      this.setToken(null);
-      // Só redireciona para login se não for a verificação inicial do token
       if (path !== "/auth/me") {
+        this.clearTokens();
         window.dispatchEvent(new Event("auth:logout"));
       }
       throw new Error("Sessão expirada. Faça login novamente.");
@@ -218,30 +280,49 @@ class ApiClient {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || `HTTP ${res.status}`);
     }
+
     if (res.status === 204) return undefined as T;
     return res.json();
   }
 
-  // Auth
+  // ── Auth ────────────────────────────────────────────────────────────────────
+
   async register(data: { name: string; email: string; password: string }) {
-    return this.request<{ token: string; user: User }>("/auth/register", {
+    return this.request<{
+      accessToken: string;
+      refreshToken: string;
+      user: User;
+    }>("/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
   async login(data: { email: string; password: string }) {
-    return this.request<{ token: string; user: User }>("/auth/login", {
+    return this.request<{
+      accessToken: string;
+      refreshToken: string;
+      user: User;
+    }>("/auth/login", {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  async logout(refreshToken: string) {
+    await this.request<void>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => {}); // logout silencioso se o servidor estiver indisponível
+    this.clearTokens();
   }
 
   async me() {
     return this.request<User>("/auth/me");
   }
 
-  // Profile
+  // ── Profile ─────────────────────────────────────────────────────────────────
+
   async updateProfile(data: Partial<{ name: string; email: string }>) {
     return this.request<User>("/profile", {
       method: "PUT",
@@ -256,7 +337,8 @@ class ApiClient {
     });
   }
 
-  // Categories
+  // ── Categories ──────────────────────────────────────────────────────────────
+
   async getCategories() {
     return this.request<Category[]>("/categories");
   }
@@ -315,7 +397,8 @@ class ApiClient {
     );
   }
 
-  // Transactions
+  // ── Transactions ────────────────────────────────────────────────────────────
+
   async getTransactions(params: {
     month?: string;
     categoryId?: string;
@@ -344,10 +427,7 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
-    return {
-      ...tx,
-      date: (tx.date as string).slice(0, 10),
-    };
+    return { ...tx, date: (tx.date as string).slice(0, 10) };
   }
 
   async updateTransaction(
@@ -369,7 +449,8 @@ class ApiClient {
     return this.request<Summary>(`/transactions/summary${qs}`);
   }
 
-  // Budgets
+  // ── Budgets ─────────────────────────────────────────────────────────────────
+
   async getBudgets(month?: string) {
     const qs = month ? `?month=${month}` : "";
     return this.request<Budget[]>(`/budgets${qs}`);
@@ -391,11 +472,11 @@ class ApiClient {
     return this.request<void>(`/budgets/${id}`, { method: "DELETE" });
   }
 
-  // Recurring
+  // ── Recurring ───────────────────────────────────────────────────────────────
+
   async getRecurring() {
     return this.request<Recurring[]>("/recurring");
   }
-
   async getPendingRecurring() {
     return this.request<Recurring[]>("/recurring/pending");
   }
@@ -428,7 +509,8 @@ class ApiClient {
     });
   }
 
-  // Notifications
+  // ── Notifications ───────────────────────────────────────────────────────────
+
   async getNotifications(unreadOnly = false, limit = 20) {
     return this.request<NotificationList>(
       `/notifications?unreadOnly=${unreadOnly}&limit=${limit}`,
@@ -448,6 +530,7 @@ class ApiClient {
       body: JSON.stringify({}),
     });
   }
+
   async deleteNotification(id: string) {
     return this.request<void>(`/notifications/${id}`, { method: "DELETE" });
   }
@@ -458,7 +541,8 @@ class ApiClient {
     });
   }
 
-  // Credit Cards
+  // ── Credit Cards ─────────────────────────────────────────────────────────────
+
   async getCreditCards() {
     return this.request<CreditCard[]>("/credit-cards");
   }
@@ -494,10 +578,7 @@ class ApiClient {
   ) {
     return this.request<CreditCardTransaction>(
       `/credit-cards/${cardId}/transactions`,
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-      },
+      { method: "POST", body: JSON.stringify(data) },
     );
   }
 
@@ -520,10 +601,7 @@ class ApiClient {
   ) {
     return this.request<Transaction>(
       `/credit-cards/invoices/${invoiceId}/pay`,
-      {
-        method: "POST",
-        body: JSON.stringify(data),
-      },
+      { method: "POST", body: JSON.stringify(data) },
     );
   }
 }

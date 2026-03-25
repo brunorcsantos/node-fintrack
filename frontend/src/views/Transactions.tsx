@@ -1,18 +1,18 @@
 // src/views/Transactions.tsx
-import { useState, useEffect, useMemo, useRef } from "react";
-import type {
-  Category,
-  Transaction,
-  CreditCard,
-} from "../lib/api";
+import { useState, useMemo, useRef } from "react";
+import type { Category, Transaction, CreditCard } from "../lib/api";
+import type { useRecurring } from "../hooks/useRecurring";
 import { S } from "../styles";
 import { fmt } from "../helpers";
+import { useIsMobile } from "../hooks/useIsMobile";
 import Badge from "../components/Badge";
 import AddModal from "../components/AddModal";
 import TransactionList from "../components/TransactionList";
 import RecurringManager from "../components/RecurringManager";
 import CreditCardStatement from "../components/CreditCardStatement";
-import { useRecurring } from "../hooks/useRecurring";
+
+// Tipo derivado do hook para garantir consistência sem duplicar a definição
+type RecurringState = ReturnType<typeof useRecurring>;
 
 interface TransactionsProps {
   filteredTx: Transaction[];
@@ -42,8 +42,13 @@ interface TransactionsProps {
   onPayInvoice: (
     invoiceId: string,
     data: { categoryId: string; subcategoryId?: string; date?: string },
-  ) => Promise<any>;
+  ) => Promise<unknown>;
   onDeleteCardTransaction: (cardId: string, txId: string) => Promise<void>;
+  // CORREÇÃO: recebe o estado já instanciado em vez de criar useRecurring() aqui.
+  // Antes: `const { recurring, ... } = useRecurring()` dentro deste componente
+  // gerava uma segunda instância paralela à do AuthenticatedApp, resultando em
+  // 2x chamadas à API e estados dessincronizados.
+  recurringState: RecurringState;
 }
 
 export default function Transactions({
@@ -70,28 +75,23 @@ export default function Transactions({
   onPayInvoice,
   onDeleteCardTransaction,
   onAddNew,
+  recurringState,
 }: TransactionsProps) {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  // CORREÇÃO: useIsMobile centralizado — elimina o useState + listener local
+  const isMobile = useIsMobile();
+
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [activeTab, setActiveTab] = useState<
-    "transactions" | "recurring" | "cards"
-  >("transactions");
+  const [activeTab, setActiveTab] = useState<"transactions" | "recurring" | "cards">("transactions");
   const searchRef = useRef<HTMLInputElement>(null);
-  const { recurring, deleteRecurring, updateRecurring } = useRecurring();
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // Desestrutura do estado compartilhado passado por prop
+  const { recurring, deleteRecurring, updateRecurring } = recurringState;
 
-  // Categoria local selecionada
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === filterCategoryLocal),
     [categories, filterCategoryLocal],
   );
 
-  // Categorias disponíveis para o tipo selecionado
   const availableCategories = useMemo(() => {
     if (filterType === "all") return [];
     const catIds = new Set(
@@ -102,20 +102,17 @@ export default function Transactions({
     return categories.filter((c) => catIds.has(c.id));
   }, [filteredTx, filterType, categories]);
 
-  // Subcategorias da categoria selecionada
   const availableSubcategories = useMemo(() => {
     if (!selectedCategory) return [];
     return selectedCategory.subcategories;
   }, [selectedCategory]);
 
-  // Reset ao trocar tipo
   const handleTypeChange = (t: "all" | "income" | "expense") => {
     setFilterType(t);
     setFilterCategoryLocal("all");
     setFilterSubcategory("all");
   };
 
-  // Reset subcategoria ao trocar categoria
   const handleCategoryChange = (catId: string) => {
     setFilterCategoryLocal(catId);
     setFilterSubcategory("all");
@@ -131,13 +128,9 @@ export default function Transactions({
     padding: "6px 14px",
     borderRadius: "var(--radius-full)",
     border: "1px solid",
-    borderColor: active
-      ? color || "var(--accent-blue)"
-      : "var(--border-default)",
+    borderColor: active ? color || "var(--accent-blue)" : "var(--border-default)",
     background: active
-      ? color
-        ? color + "22"
-        : "var(--accent-blue)22"
+      ? color ? color + "22" : "var(--accent-blue)22"
       : "transparent",
     color: active ? color || "var(--accent-blue)" : "var(--text-muted)",
     cursor: "pointer",
@@ -148,13 +141,7 @@ export default function Transactions({
   });
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: isMobile ? 12 : 16,
-      }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 12 : 16 }}>
       {/* Cabeçalho */}
       <div
         style={{
@@ -167,14 +154,7 @@ export default function Transactions({
       >
         <h2 style={{ ...S.pageTitle, fontSize: isMobile ? 18 : 22 }}>
           Lançamentos
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "var(--text-muted)",
-              marginLeft: 8,
-            }}
-          >
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)", marginLeft: 8 }}>
             {activeTab === "transactions"
               ? `${total} registros`
               : `${recurring.length} recorrente${recurring.length !== 1 ? "s" : ""}`}
@@ -196,7 +176,6 @@ export default function Transactions({
           gap: 8,
         }}
       >
-        {/* Tabs */}
         <div
           style={{
             display: "flex",
@@ -224,12 +203,8 @@ export default function Transactions({
                 cursor: "pointer",
                 fontSize: 13,
                 fontWeight: 600,
-                background:
-                  activeTab === tab.key ? "var(--bg-surface)" : "transparent",
-                color:
-                  activeTab === tab.key
-                    ? "var(--text-primary)"
-                    : "var(--text-muted)",
+                background: activeTab === tab.key ? "var(--bg-surface)" : "transparent",
+                color: activeTab === tab.key ? "var(--text-primary)" : "var(--text-muted)",
                 boxShadow: activeTab === tab.key ? "var(--shadow-sm)" : "none",
                 transition: "all 0.15s",
               }}
@@ -239,14 +214,8 @@ export default function Transactions({
           ))}
         </div>
 
-        {/* Botão Novo Lançamento */}
         <button
-          style={{
-            ...S.btn("primary"),
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
+          style={{ ...S.btn("primary"), display: "flex", alignItems: "center", gap: 6 }}
           onClick={onAddNew}
         >
           <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
@@ -287,24 +256,8 @@ export default function Transactions({
             }}
           >
             {/* Tipo */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                flexWrap: "wrap" as const,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase" as const,
-                  marginRight: 4,
-                }}
-              >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
                 Tipo:
               </span>
               {(
@@ -314,11 +267,7 @@ export default function Transactions({
                   { key: "expense", label: "💸 Despesas" },
                 ] as const
               ).map((t) => (
-                <button
-                  key={t.key}
-                  style={pillActive(filterType === t.key)}
-                  onClick={() => handleTypeChange(t.key)}
-                >
+                <button key={t.key} style={pillActive(filterType === t.key)} onClick={() => handleTypeChange(t.key)}>
                   {t.label}
                 </button>
               ))}
@@ -326,41 +275,15 @@ export default function Transactions({
 
             {/* Categoria */}
             {filterType !== "all" && availableCategories.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap" as const,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "var(--text-muted)",
-                    letterSpacing: "0.05em",
-                    textTransform: "uppercase" as const,
-                    marginRight: 4,
-                  }}
-                >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" as const }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
                   Categoria:
                 </span>
-                <button
-                  style={pillActive(filterCategoryLocal === "all")}
-                  onClick={() => handleCategoryChange("all")}
-                >
+                <button style={pillActive(filterCategoryLocal === "all")} onClick={() => handleCategoryChange("all")}>
                   Todas
                 </button>
                 {availableCategories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    style={pillActive(
-                      filterCategoryLocal === cat.id,
-                      cat.color,
-                    )}
-                    onClick={() => handleCategoryChange(cat.id)}
-                  >
+                  <button key={cat.id} style={pillActive(filterCategoryLocal === cat.id, cat.color)} onClick={() => handleCategoryChange(cat.id)}>
                     {cat.icon} {cat.name}
                   </button>
                 ))}
@@ -368,52 +291,31 @@ export default function Transactions({
             )}
 
             {/* Subcategoria */}
-            {filterCategoryLocal !== "all" &&
-              availableSubcategories.length > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap" as const,
-                    paddingLeft: 12,
-                    borderLeft: `3px solid ${selectedCategory?.color || "var(--accent-blue)"}`,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "var(--text-muted)",
-                      letterSpacing: "0.05em",
-                      textTransform: "uppercase" as const,
-                      marginRight: 4,
-                    }}
-                  >
-                    Subcategoria:
-                  </span>
-                  <button
-                    style={pillActive(filterSubcategory === "all")}
-                    onClick={() => setFilterSubcategory("all")}
-                  >
-                    Todas
+            {filterCategoryLocal !== "all" && availableSubcategories.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap" as const,
+                  paddingLeft: 12,
+                  borderLeft: `3px solid ${selectedCategory?.color || "var(--accent-blue)"}`,
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginRight: 4 }}>
+                  Subcategoria:
+                </span>
+                <button style={pillActive(filterSubcategory === "all")} onClick={() => setFilterSubcategory("all")}>
+                  Todas
+                </button>
+                {availableSubcategories.map((sub) => (
+                  <button key={sub.id} style={pillActive(filterSubcategory === sub.id, selectedCategory?.color)} onClick={() => setFilterSubcategory(sub.id)}>
+                    {sub.icon} {sub.name}
                   </button>
-                  {availableSubcategories.map((sub) => (
-                    <button
-                      key={sub.id}
-                      style={pillActive(
-                        filterSubcategory === sub.id,
-                        selectedCategory?.color,
-                      )}
-                      onClick={() => setFilterSubcategory(sub.id)}
-                    >
-                      {sub.icon} {sub.name}
-                    </button>
-                  ))}
-                </div>
-              )}
+                ))}
+              </div>
+            )}
 
-            {/* Limpar filtros */}
             {hasActiveFilters && (
               <button
                 onClick={() => {
@@ -422,12 +324,7 @@ export default function Transactions({
                   setFilterSubcategory("all");
                   setSearch("");
                 }}
-                style={{
-                  ...S.btn("danger"),
-                  padding: "5px 12px",
-                  fontSize: 12,
-                  alignSelf: "flex-start" as const,
-                }}
+                style={{ ...S.btn("danger"), padding: "5px 12px", fontSize: 12, alignSelf: "flex-start" as const }}
               >
                 ✕ Limpar filtros
               </button>
@@ -436,14 +333,7 @@ export default function Transactions({
 
           {/* Lista + Busca */}
           <div style={isMobile ? S.cardMobile : S.card}>
-            {/* Campo de busca — isolado para não re-renderizar com a lista */}
-            <div
-              style={{
-                marginBottom: 16,
-                paddingBottom: 16,
-                borderBottom: "1px solid var(--border-subtle)",
-              }}
-            >
+            <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--border-subtle)" }}>
               <div
                 style={{
                   display: "flex",
@@ -455,16 +345,7 @@ export default function Transactions({
                   gap: 8,
                 }}
               >
-                <span
-                  style={{
-                    color: "var(--text-muted)",
-                    fontSize: 14,
-                    flexShrink: 0,
-                    lineHeight: 1,
-                  }}
-                >
-                  🔍
-                </span>
+                <span style={{ color: "var(--text-muted)", fontSize: 14, flexShrink: 0, lineHeight: 1 }}>🔍</span>
                 <input
                   ref={searchRef}
                   autoFocus
@@ -492,16 +373,7 @@ export default function Transactions({
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      fontSize: 14,
-                      padding: 2,
-                      flexShrink: 0,
-                      lineHeight: 1,
-                    }}
+                    style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: 2, flexShrink: 0, lineHeight: 1 }}
                   >
                     ✕
                   </button>
@@ -509,7 +381,6 @@ export default function Transactions({
               </div>
             </div>
 
-            {/* Lista de transações — componente separado para evitar re-render do input */}
             <TransactionList
               filteredTx={filteredTx}
               categories={categories}

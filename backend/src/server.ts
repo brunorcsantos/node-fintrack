@@ -1,7 +1,11 @@
 // src/server.ts
+// IMPORTANTE: env deve ser o primeiro import — valida variáveis antes de tudo
+import { env } from "./lib/env";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
+import { registerRateLimit } from "./lib/rateLimit";
+import { registerErrorHandler } from "./middleware/errorHandler";
 import { authRoutes } from "./routes/auth";
 import { transactionRoutes } from "./routes/transactions";
 import { categoryRoutes } from "./routes/categories";
@@ -19,24 +23,37 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 
 async function main() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({
+    logger: {
+      // Logs estruturados em produção (JSON), legíveis em desenvolvimento
+      transport: env.NODE_ENV === "development"
+        ? { target: "pino-pretty", options: { colorize: true } }
+        : undefined,
+      level: env.NODE_ENV === "production" ? "warn" : "info",
+    },
+  });
 
-  // ── Zod type provider ─────────────────────────────────────────────────────
+  // Zod type provider
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  // ── Serializer global — converte Date e Decimal para tipos primitivos ───────
-  app.addHook("preSerialization", async (_req, _reply, payload: any) => {
-    const normalize = (obj: any): any => {
+  // Rate limiting — registrado antes das rotas
+  await registerRateLimit(app);
+
+  // Error handler global — registrado antes das rotas
+  registerErrorHandler(app);
+
+  // Serializer global — converte Date e Decimal do Prisma para tipos primitivos
+  app.addHook("preSerialization", async (_req, _reply, payload: unknown) => {
+    const normalize = (obj: unknown): unknown => {
       if (obj === null || obj === undefined) return obj;
       if (obj instanceof Date) return obj.toISOString();
-      // Decimal do Prisma tem método toNumber()
-      if (typeof obj === "object" && typeof obj.toNumber === "function")
-        return obj.toNumber();
+      if (typeof obj === "object" && typeof (obj as Record<string, unknown>).toNumber === "function")
+        return (obj as { toNumber(): number }).toNumber();
       if (Array.isArray(obj)) return obj.map(normalize);
       if (typeof obj === "object") {
         return Object.fromEntries(
-          Object.entries(obj).map(([k, v]) => [k, normalize(v)]),
+          Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, normalize(v)]),
         );
       }
       return obj;
@@ -44,64 +61,63 @@ async function main() {
     return normalize(payload);
   });
 
-  // ── Swagger ────────────────────────────────────────────────────────────────
+  // Swagger
   await app.register(swagger, {
     transform: jsonSchemaTransform,
     openapi: {
       openapi: "3.0.0",
-      info: {
-        title: "FinTrack API",
-        description: "API REST para gerenciamento de finanças pessoais",
-        version: "1.0.0",
-      },
-      servers: [
-        { url: "http://localhost:3333", description: "Desenvolvimento" },
-      ],
+      info: { title: "FinTrack API", description: "API REST para finanças pessoais", version: "1.0.0" },
+      servers: [{ url: `http://localhost:${env.PORT}`, description: "Desenvolvimento" }],
       components: {
         securitySchemes: {
-          bearerAuth: {
-            type: "http",
-            scheme: "bearer",
-            bearerFormat: "JWT",
-            description: "Token JWT obtido via /auth/login",
-          },
+          bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
         },
       },
       tags: [
         { name: "Auth", description: "Autenticação e registro" },
-        { name: "Transactions", description: "Gerenciamento de transações" },
+        { name: "Transactions", description: "Transações" },
         { name: "Categories", description: "Categorias e subcategorias" },
-        { name: "Budgets", description: "Orçamentos mensais" },
-        { name: "Recurring", description: "Lançamentos recorrentes" },
-        { name: "Profile", description: "Perfil do usuário" },
-        { name: "Notifications", description: "Notificações do usuário" },
-        { name: "CreditCards", description: "Cartões de crédito e faturas" },
+        { name: "Budgets", description: "Orçamentos" },
+        { name: "Recurring", description: "Recorrentes" },
+        { name: "Profile", description: "Perfil" },
+        { name: "Notifications", description: "Notificações" },
+        { name: "CreditCards", description: "Cartões e faturas" },
       ],
     },
   });
 
   await app.register(swaggerUi, {
     routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "list",
-      deepLinking: true,
-      persistAuthorization: true,
-    },
+    uiConfig: { docExpansion: "list", deepLinking: true, persistAuthorization: true },
   });
 
-  // ── Plugins ────────────────────────────────────────────────────────────────
+  // Plugins
   await app.register(cors, {
-    origin: true,
+    origin: env.FRONTEND_URL,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 
+  // Access token — verificado pelo middleware `authenticate` em cada rota protegida
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET || "change-this-secret-in-production",
+    secret: env.JWT_SECRET,
+    namespace: "access",
+    jwtVerify: "accessVerify",
+    jwtSign: "accessSign",
   });
 
-  // ── Routes ─────────────────────────────────────────────────────────────────
+  // Refresh token — secret separado, usado apenas em /auth/refresh
+  // Se JWT_REFRESH_SECRET não estiver definido, usa JWT_SECRET com sufixo
+  // (menos seguro, mas funcional para desenvolvimento)
+  await app.register(jwt, {
+    secret: env.JWT_REFRESH_SECRET ?? env.JWT_SECRET + "_refresh",
+    namespace: "refresh",
+    jwtVerify: "refreshVerify",
+    jwtSign: "refreshSign",
+  });
+
+  // Rotas
   await app.register(authRoutes);
   await app.register(transactionRoutes);
   await app.register(categoryRoutes);
@@ -111,18 +127,17 @@ async function main() {
   await app.register(notificationRoutes);
   await app.register(creditCardRoutes);
 
-  // ── Health check ───────────────────────────────────────────────────────────
+  // Health check
   app.get("/health", async () => ({
     status: "ok",
     timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV,
   }));
 
-  // ── Start ──────────────────────────────────────────────────────────────────
-  const PORT = Number(process.env.PORT) || 3333;
   try {
-    await app.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`🚀 FinTrack API rodando em http://localhost:${PORT}`);
-    console.log(`📚 Documentação em http://localhost:${PORT}/docs`);
+    await app.listen({ port: env.PORT, host: "0.0.0.0" });
+    app.log.info(`FinTrack API rodando em http://localhost:${env.PORT}`);
+    app.log.info(`Documentação em http://localhost:${env.PORT}/docs`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

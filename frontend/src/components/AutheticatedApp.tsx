@@ -9,6 +9,7 @@ import { useRecurring } from "../hooks/useRecurring";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../hooks/useNotifications";
 import { useCreditCards } from "../hooks/useCreditCards";
+import { useIsMobile } from "../hooks/useIsMobile";
 import Header from "./Header";
 import Filters from "./Filters";
 import AddModal from "./AddModal";
@@ -22,13 +23,11 @@ import Setup from "../views/Setup";
 
 export default function AuthenticatedApp() {
   const { logout } = useAuth();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  // CORREÇÃO: useIsMobile centralizado — antes cada componente fazia
+  // useState(window.innerWidth < 768) + addEventListener individualmente,
+  // criando N listeners simultâneos e quebrando em SSR/testes.
+  const isMobile = useIsMobile();
 
   const [view, setView] = useState<View>("dashboard");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -37,16 +36,12 @@ export default function AuthenticatedApp() {
   );
   const [filterCategory, setFilterCategory] = useState("all");
 
-  // ── Filtros da view Transactions ─────────────────────────────────────────
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense">(
-    "all",
-  );
+  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
   const [filterCategoryLocal, setFilterCategoryLocal] = useState("all");
   const [filterSubcategory, setFilterSubcategory] = useState("all");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Reset filtros ao trocar mês ou categoria global
   useEffect(() => {
     setFilterType("all");
     setFilterCategoryLocal("all");
@@ -54,13 +49,11 @@ export default function AuthenticatedApp() {
     setSearch("");
   }, [filterMonth, filterCategory]);
 
-  // Debounce — só atualiza debouncedSearch após 500ms
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  // ── Hooks de dados ────────────────────────────────────────────────────────
   const {
     categories,
     loading: loadingCats,
@@ -68,16 +61,20 @@ export default function AuthenticatedApp() {
     refetch: refetchCategories,
   } = useCategories();
 
-  // Summary — totais do mês completo (não afetado pela paginação)
   const { summary, refetch: refetchSummary } = useSummary(filterMonth);
 
-  const { createRecurring, pending, confirmRecurring } = useRecurring();
+  // CORREÇÃO: useRecurring instanciado UMA única vez aqui no topo da árvore.
+  // Antes estava duplicado: aqui E dentro de <Transactions>, causando:
+  // - 2 chamadas GET /recurring e GET /recurring/pending por navegação
+  // - estados dessincronizados entre Dashboard (alerts) e Transactions (lista)
+  // - confirmRecurring no Dashboard não atualizava a lista em Transactions
+  const recurringState = useRecurring();
 
   const {
     upcomingInvoices,
     payInvoice,
     cards,
-    createTransaction,
+    createTransaction: createCardTransaction,
     deleteTransaction: deleteCardTransaction,
   } = useCreditCards();
 
@@ -89,6 +86,11 @@ export default function AuthenticatedApp() {
     deleteNotification,
     deleteReadNotifications,
   } = useNotifications();
+
+  const hasActiveFilters =
+    filterType !== "all" ||
+    filterCategoryLocal !== "all" ||
+    !!debouncedSearch.trim();
 
   const {
     transactions,
@@ -111,18 +113,10 @@ export default function AuthenticatedApp() {
           : filterCategory,
     type: filterType === "all" ? undefined : filterType,
     search: debouncedSearch.trim() || undefined,
-    limit:
-      filterType !== "all" ||
-      filterCategoryLocal !== "all" ||
-      debouncedSearch.trim()
-        ? 999
-        : 10,
+    limit: hasActiveFilters ? 999 : 10,
     onMutate: refetchSummary,
   });
 
-  // ── Dados derivados ───────────────────────────────────────────────────────
-
-  // filteredTx — apenas para exibição na lista paginada
   const filteredTx = useMemo(
     () =>
       filterCategory === "all"
@@ -131,7 +125,6 @@ export default function AuthenticatedApp() {
     [transactions, filterCategory],
   );
 
-  // Totais do mês completo via summary (não da página atual)
   const totalIncome = useMemo(
     () =>
       Number(
@@ -148,7 +141,6 @@ export default function AuthenticatedApp() {
     [summary],
   );
 
-  // Gastos por categoria do mês completo via summary
   const expenseByCategory = useMemo(() => {
     if (!summary) return {};
     const map: Record<string, number> = {};
@@ -166,7 +158,7 @@ export default function AuthenticatedApp() {
         notes?: string;
       },
     ) => {
-      await addTransaction(tx as any);
+      await addTransaction(tx as Parameters<typeof addTransaction>[0]);
       setShowAddModal(false);
     },
     [addTransaction],
@@ -219,9 +211,10 @@ export default function AuthenticatedApp() {
                 totalExpenses={totalExpenses}
                 expenseByCategory={expenseByCategory}
                 setView={setView}
-                pending={pending}
-                confirmRecurring={confirmRecurring}
-                upcomingInvoices={upcomingInvoices} // ← adicionar
+                // Passa o estado de recurringState já instanciado — sem segunda chamada à API
+                pending={recurringState.pending}
+                confirmRecurring={recurringState.confirmRecurring}
+                upcomingInvoices={upcomingInvoices}
                 onPayInvoice={payInvoice}
               />
             )}
@@ -234,13 +227,7 @@ export default function AuthenticatedApp() {
                 total={total}
                 page={page}
                 totalPages={totalPages}
-                limit={
-                  filterType !== "all" ||
-                  filterCategoryLocal !== "all" ||
-                  debouncedSearch.trim()
-                    ? 999
-                    : 10
-                }
+                limit={hasActiveFilters ? 999 : 10}
                 deleteTransaction={deleteTransaction}
                 updateTransaction={updateTransaction}
                 onPageChange={goToPage}
@@ -256,6 +243,8 @@ export default function AuthenticatedApp() {
                 onPayInvoice={payInvoice}
                 onDeleteCardTransaction={deleteCardTransaction}
                 onAddNew={() => setShowAddModal(true)}
+                // Passa o estado compartilhado em vez de criar nova instância
+                recurringState={recurringState}
               />
             )}
             {view === "budgets" && (
@@ -285,12 +274,12 @@ export default function AuthenticatedApp() {
           cards={cards}
           onAdd={handleAddTransaction}
           onAddRecurring={async (data) => {
-            await createRecurring(data);
+            await recurringState.createRecurring(data);
             setShowAddModal(false);
             refetchSummary();
           }}
           onAddCardTransaction={async (cardId, data) => {
-            await createTransaction(cardId, data);
+            await createCardTransaction(cardId, data);
             setShowAddModal(false);
           }}
           onClose={() => setShowAddModal(false)}

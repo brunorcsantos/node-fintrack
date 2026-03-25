@@ -26,27 +26,22 @@ const txSchema = z.object({
 
 const security = [{ bearerAuth: [] }];
 
-// ── Helper: calcula o mês da fatura com base na data da compra ────────────────
 function getInvoiceMonth(purchaseDate: Date, closingDay: number): string {
   const day = purchaseDate.getUTCDate();
-  const month = purchaseDate.getUTCMonth(); // 0-11
+  const month = purchaseDate.getUTCMonth();
   const year = purchaseDate.getUTCFullYear();
 
-  // Se a compra foi APÓS o fechamento → fatura do próximo mês
   if (day > closingDay) {
     const nextMonth = month === 11 ? 0 : month + 1;
     const nextYear = month === 11 ? year + 1 : year;
     return `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}`;
   }
 
-  // Se a compra foi ANTES ou NO dia do fechamento → fatura do mês atual
   return `${year}-${String(month + 1).padStart(2, "0")}`;
 }
 
-// ── Helper: calcula a data de vencimento da fatura ────────────────────────────
 function getInvoiceDueDate(invoiceMonth: string, dueDay: number): Date {
   const [year, month] = invoiceMonth.split("-").map(Number);
-  // Vencimento é no próprio mês da fatura
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const day = Math.min(dueDay, lastDay);
   return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
@@ -54,7 +49,6 @@ function getInvoiceDueDate(invoiceMonth: string, dueDay: number): Date {
 
 export async function creditCardRoutes(app: FastifyInstance) {
 
-  // ── GET /credit-cards ────────────────────────────────────────────────────
   app.get("/credit-cards", {
     schema: { tags: ["CreditCards"], summary: "Listar cartões ativos", security },
     onRequest: [authenticate],
@@ -66,12 +60,11 @@ export async function creditCardRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── POST /credit-cards ───────────────────────────────────────────────────
   app.post("/credit-cards", {
     schema: { tags: ["CreditCards"], summary: "Criar cartão", security, body: cardSchema },
     onRequest: [authenticate],
   }, async (req, reply) => {
-    console.log("body recebido:", req.body);
+    // CORREÇÃO: removido console.log(form) que vazia o body do request em produção
     const { sub: userId } = req.user as { sub: string };
     const parsed = cardSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
@@ -82,7 +75,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     return reply.status(201).send(card);
   });
 
-  // ── PUT /credit-cards/:id ────────────────────────────────────────────────
   app.put("/credit-cards/:id", {
     schema: { tags: ["CreditCards"], summary: "Atualizar cartão", security, body: cardSchema.partial() },
     onRequest: [authenticate],
@@ -98,7 +90,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     return prisma.creditCard.update({ where: { id }, data: parsed.data });
   });
 
-  // ── DELETE /credit-cards/:id ─────────────────────────────────────────────
   app.delete("/credit-cards/:id", {
     schema: { tags: ["CreditCards"], summary: "Desativar cartão", security },
     onRequest: [authenticate],
@@ -113,7 +104,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  // ── GET /credit-cards/:id/transactions ───────────────────────────────────
   app.get("/credit-cards/:id/transactions", {
     schema: {
       tags: ["CreditCards"], summary: "Listar compras do cartão", security,
@@ -137,7 +127,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── POST /credit-cards/:id/transactions ──────────────────────────────────
   app.post("/credit-cards/:id/transactions", {
     schema: { tags: ["CreditCards"], summary: "Registrar compra no cartão", security, body: txSchema },
     onRequest: [authenticate],
@@ -154,7 +143,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     const invoiceMonth = getInvoiceMonth(purchaseDate, card.closingDay);
     const dueDate = getInvoiceDueDate(invoiceMonth, card.dueDay);
 
-    // Cria a compra
     const tx = await prisma.creditCardTransaction.create({
       data: {
         ...parsed.data,
@@ -166,7 +154,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
       include: { category: true, subcategory: true },
     });
 
-    // Upsert da fatura — recalcula o total
     const invoiceTotal = await prisma.creditCardTransaction.aggregate({
       where: { cardId, invoiceMonth },
       _sum: { amount: true },
@@ -181,7 +168,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
       },
     });
 
-    // Cria notificação se fatura do próximo mês foi criada/atualizada
     const today = new Date();
     const [invYear, invMonth] = invoiceMonth.split("-").map(Number);
     const invoiceDate = new Date(Date.UTC(invYear, invMonth - 1, 1));
@@ -200,7 +186,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     return reply.status(201).send(tx);
   });
 
-  // ── DELETE /credit-cards/:id/transactions/:txId ──────────────────────────
   app.delete("/credit-cards/:id/transactions/:txId", {
     schema: { tags: ["CreditCards"], summary: "Remover compra do cartão", security },
     onRequest: [authenticate],
@@ -213,7 +198,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
 
     await prisma.creditCardTransaction.delete({ where: { id: txId } });
 
-    // Recalcula o total da fatura
     const invoiceTotal = await prisma.creditCardTransaction.aggregate({
       where: { cardId, invoiceMonth: tx.invoiceMonth },
       _sum: { amount: true },
@@ -226,7 +210,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
         data: { totalAmount: total },
       });
     } else {
-      // Remove a fatura se não há mais compras
       await prisma.creditCardInvoice.deleteMany({
         where: { cardId, month: tx.invoiceMonth },
       });
@@ -235,7 +218,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  // ── GET /credit-cards/invoices ───────────────────────────────────────────
   app.get("/credit-cards/invoices", {
     schema: {
       tags: ["CreditCards"], summary: "Listar faturas", security,
@@ -260,7 +242,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── POST /credit-cards/invoices/:invoiceId/pay ───────────────────────────
   app.post("/credit-cards/invoices/:invoiceId/pay", {
     schema: {
       tags: ["CreditCards"], summary: "Pagar fatura", security,
@@ -289,7 +270,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
       ? new Date(date + "T12:00:00.000Z")
       : new Date();
 
-    // Cria o lançamento de pagamento da fatura
     const tx = await prisma.transaction.create({
       data: {
         description: `Fatura ${invoice.card.name} — ${invoice.month}`,
@@ -304,7 +284,6 @@ export async function creditCardRoutes(app: FastifyInstance) {
       include: { category: true, subcategory: true },
     });
 
-    // Marca fatura como paga
     await prisma.creditCardInvoice.update({
       where: { id: invoiceId },
       data: { paid: true, paidAt: paymentDate, transactionId: tx.id },

@@ -59,21 +59,43 @@ export async function budgetRoutes(app: FastifyInstance) {
 
       const { amount, month, categoryId, subcategoryId } = parsed.data;
 
-      const budget = await prisma.budget.upsert({
+      // CORREÇÃO: O Prisma não aceita null em chaves únicas compostas no `where`
+      // do upsert. A constraint `@@unique([userId, categoryId, subcategoryId, month])`
+      // no banco usa NULL, mas Prisma exige que os campos opcionais sejam omitidos
+      // ou tratados com `deleteMany + create` quando o valor é null/undefined.
+      //
+      // Estratégia: busca o registro existente primeiro, depois atualiza ou cria.
+      // Isso evita o erro "Value null is not valid" do Prisma no upsert composto.
+      const existing = await prisma.budget.findFirst({
         where: {
-          userId_categoryId_subcategoryId_month: {
-            userId,
-            categoryId: categoryId ?? "",
-            subcategoryId: subcategoryId ?? "",
-            month,
-          },
+          userId,
+          month,
+          categoryId: categoryId ?? null,
+          subcategoryId: subcategoryId ?? null,
         },
-        update: { amount },
-        create: { amount, month, userId, categoryId, subcategoryId },
+      });
+
+      if (existing) {
+        const budget = await prisma.budget.update({
+          where: { id: existing.id },
+          data: { amount },
+          include: { category: true, subcategory: true },
+        });
+        return budget;
+      }
+
+      const budget = await prisma.budget.create({
+        data: {
+          amount,
+          month,
+          userId,
+          categoryId: categoryId ?? null,
+          subcategoryId: subcategoryId ?? null,
+        },
         include: { category: true, subcategory: true },
       });
 
-      return budget;
+      return reply.status(201).send(budget);
     },
   );
 

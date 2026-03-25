@@ -16,11 +16,9 @@ interface CreditCardStatementProps {
   onPayInvoice: (
     invoiceId: string,
     data: { categoryId: string; subcategoryId?: string; date?: string },
-  ) => Promise<any>;
+  ) => Promise<unknown>;
   onDeleteTransaction: (cardId: string, txId: string) => Promise<void>;
 }
-
-
 
 export default function CreditCardStatement({
   cards,
@@ -28,11 +26,13 @@ export default function CreditCardStatement({
   onPayInvoice,
   onDeleteTransaction,
 }: CreditCardStatementProps) {
+  // CORREÇÃO: Todos os hooks devem vir antes de qualquer return condicional.
+  // Antes, useState era chamado após `if (!cards || !categories) return null`,
+  // o que violava as Rules of Hooks e causava crashes em re-renders.
   const [selectedCardId, setSelectedCardId] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7),
   );
-  if (!cards || !categories) return null;
   const [transactions, setTransactions] = useState<CreditCardTransaction[]>([]);
   const [invoice, setInvoice] = useState<CreditCardInvoice | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function CreditCardStatement({
     if (cards.length > 0 && !selectedCardId) {
       setSelectedCardId(cards[0].id);
     }
-  }, [cards]);
+  }, [cards, selectedCardId]);
 
   const selectedCard = cards?.find((c) => c.id === selectedCardId);
   const selectedCategory = categories.find((c) => c.id === payCategory);
@@ -73,6 +73,9 @@ export default function CreditCardStatement({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Guard movido para APÓS todos os hooks
+  if (!cards || !categories) return null;
 
   const handlePayInvoice = async () => {
     if (!invoice || !payCategory) return;
@@ -123,7 +126,6 @@ export default function CreditCardStatement({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Seleção de cartão e mês */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" as const }}>
-        {/* Cartões */}
         <div
           style={{
             display: "flex",
@@ -172,7 +174,6 @@ export default function CreditCardStatement({
           ))}
         </div>
 
-        {/* Mês */}
         <input
           type="month"
           value={selectedMonth}
@@ -291,7 +292,6 @@ export default function CreditCardStatement({
             </div>
           </div>
 
-          {/* Botão pagar fatura */}
           {invoice && !invoice.paid && (
             <div style={{ marginTop: 16 }}>
               {payingInvoice ? (

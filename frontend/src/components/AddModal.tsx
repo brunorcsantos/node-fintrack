@@ -18,7 +18,6 @@ interface AddModalProps {
     cardId: string,
     data: CreditCardTransactionInput,
   ) => Promise<void>;
-
   onClose: () => void;
   editingTransaction?: Transaction | null;
 }
@@ -42,19 +41,19 @@ export default function AddModal({
   onAdd,
   cards,
   onAddCardTransaction,
+  onAddRecurring,
   onClose,
   editingTransaction,
 }: AddModalProps) {
   const isEditing = !!editingTransaction;
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // ── Modo do modal ─────────────────────────────────────────────────────────
   const [modalMode, setModalMode] = useState<"single" | "recurring" | "card">(
     "single",
   );
   const [selectedCardId, setSelectedCardId] = useState("");
 
-  // ── Lançamento único ──────────────────────────────────────────────────────
+  // Lançamento único
   const [type, setType] = useState<"expense" | "income">(
     editingTransaction?.type || "expense",
   );
@@ -75,7 +74,7 @@ export default function AddModal({
   );
   const [notes, setNotes] = useState(editingTransaction?.notes || "");
 
-  // ── Recorrente ────────────────────────────────────────────────────────────
+  // Recorrente
   const [recurring, setRecurring] = useState<RecurringInput>(EMPTY_RECURRING);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -110,7 +109,6 @@ export default function AddModal({
     [categories, recurring.type],
   );
 
-  // ── Handlers único ────────────────────────────────────────────────────────
   const handleTypeChange = (t: "expense" | "income") => {
     setType(t);
     setCategoryId("");
@@ -130,7 +128,8 @@ export default function AddModal({
     });
   };
 
-  // ── Handlers recorrente ───────────────────────────────────────────────────
+  // CORREÇÃO: handleSubmitRecurring agora chama onAddRecurring (estava chamando
+  // onAddCardTransaction por engano, fazendo o modo recorrente nunca funcionar).
   const handleSubmitRecurring = async () => {
     setError("");
     if (!recurring.description.trim()) {
@@ -154,17 +153,10 @@ export default function AddModal({
 
     setSaving(true);
     try {
-      await onAddCardTransaction(selectedCardId, {
-        description,
-        amount: parseFloat(amount),
-        date,
-        categoryId: effectiveCategoryId,
-        subcategoryId: subcategoryId || undefined,
-        notes,
-      });
+      await onAddRecurring(recurring); // ← CORRIGIDO: era onAddCardTransaction
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erro ao salvar.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
     }
@@ -196,7 +188,6 @@ export default function AddModal({
     setSaving(true);
     try {
       await onAddCardTransaction(selectedCardId, {
-        // ← correto
         description,
         amount: parseFloat(amount),
         date,
@@ -205,8 +196,8 @@ export default function AddModal({
         notes,
       });
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Erro ao salvar.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
     }
@@ -280,7 +271,7 @@ export default function AddModal({
           </button>
         </div>
 
-        {/* Toggle Único / Recorrente — só aparece para novos lançamentos */}
+        {/* Toggle Modo — só para novos lançamentos */}
         {!isEditing && (
           <div
             style={{
@@ -369,7 +360,6 @@ export default function AddModal({
               ))}
             </div>
 
-            {/* Descrição */}
             <div>
               <div
                 style={{
@@ -390,7 +380,6 @@ export default function AddModal({
               />
             </div>
 
-            {/* Valor + Data */}
             <div
               style={{
                 display: "grid",
@@ -439,7 +428,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Categoria */}
             <div>
               <div
                 style={{
@@ -454,7 +442,7 @@ export default function AddModal({
               <div
                 style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}
               >
-                {filteredCategories(type).map((c: any) => (
+                {filteredCategories(type).map((c) => (
                   <button
                     key={c.id}
                     onClick={() => {
@@ -470,7 +458,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Subcategoria */}
             {cat && cat.subcategories.length > 0 && (
               <div>
                 <div
@@ -506,7 +493,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Observações */}
             <div>
               <div
                 style={{
@@ -529,7 +515,6 @@ export default function AddModal({
               />
             </div>
 
-            {/* Ações */}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button style={{ ...S.btn("ghost"), flex: 1 }} onClick={onClose}>
                 Cancelar
@@ -649,7 +634,6 @@ export default function AddModal({
               ))}
             </div>
 
-            {/* Descrição */}
             <div>
               <div
                 style={{
@@ -676,7 +660,6 @@ export default function AddModal({
               />
             </div>
 
-            {/* Valor */}
             <div>
               <div
                 style={{
@@ -707,7 +690,6 @@ export default function AddModal({
               />
             </div>
 
-            {/* Parcelas (apenas modo installments) */}
             {recurring.mode === "installments" && (
               <div>
                 <div
@@ -755,7 +737,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Frequência + Dia */}
             <div
               style={{
                 display: "grid",
@@ -815,7 +796,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Data de início + fim (apenas indeterminado) */}
             <div
               style={{
                 display: "grid",
@@ -870,7 +850,6 @@ export default function AddModal({
               )}
             </div>
 
-            {/* Categoria */}
             <div>
               <div
                 style={{
@@ -885,7 +864,7 @@ export default function AddModal({
               <div
                 style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}
               >
-                {recurringFilteredCats.map((c: any) => (
+                {recurringFilteredCats.map((c) => (
                   <button
                     key={c.id}
                     onClick={() =>
@@ -904,7 +883,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Subcategoria */}
             {recurringCat && recurringCat.subcategories.length > 0 && (
               <div>
                 <div
@@ -944,62 +922,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Preview parcelas */}
-            {recurring.mode === "installments" &&
-              recurring.amount &&
-              recurring.installments &&
-              recurring.startDate && (
-                <div
-                  style={{
-                    background: "var(--bg-elevated)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "12px 14px",
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    📋 Preview das parcelas
-                  </div>
-                  {Array.from({
-                    length: Math.min(recurring.installments, 3),
-                  }).map((_, i) => {
-                    const d = new Date(recurring.startDate + "T12:00:00.000Z");
-                    d.setUTCMonth(d.getUTCMonth() + i);
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "2px 0",
-                        }}
-                      >
-                        <span>{`${recurring.description} (${i + 1}/${recurring.installments})`}</span>
-                        <span>
-                          {d.toLocaleDateString("pt-BR")} — R${" "}
-                          {recurring.amount!.toLocaleString("pt-BR", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {recurring.installments > 3 && (
-                    <div style={{ marginTop: 4, color: "var(--text-muted)" }}>
-                      ... e mais {recurring.installments - 3} parcela(s)
-                    </div>
-                  )}
-                </div>
-              )}
-
-            {/* Erro */}
             {error && (
               <div
                 style={{
@@ -1018,7 +940,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Ações */}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button style={{ ...S.btn("ghost"), flex: 1 }} onClick={onClose}>
                 Cancelar
@@ -1045,7 +966,6 @@ export default function AddModal({
         {/* ── MODO CARTÃO ──────────────────────────────────────────────── */}
         {modalMode === "card" && !isEditing && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Seleção do cartão */}
             <div>
               <div
                 style={{
@@ -1119,7 +1039,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Descrição */}
             <div>
               <div
                 style={{
@@ -1139,7 +1058,6 @@ export default function AddModal({
               />
             </div>
 
-            {/* Valor + Data */}
             <div
               style={{
                 display: "grid",
@@ -1188,37 +1106,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Aviso de fatura */}
-            {selectedCardId &&
-              date &&
-              (() => {
-                const card = cards.find((c) => c.id === selectedCardId);
-                if (!card) return null;
-                const purchaseDay = new Date(
-                  date + "T12:00:00.000Z",
-                ).getUTCDate();
-                const nextMonth = purchaseDay > card.closingDay;
-                return (
-                  <div
-                    style={{
-                      background: nextMonth
-                        ? "var(--accent-orange, #E8C45A)15"
-                        : "var(--accent-green)15",
-                      border: `1px solid ${nextMonth ? "var(--accent-orange, #E8C45A)" : "var(--accent-green)"}44`,
-                      borderRadius: "var(--radius-md)",
-                      padding: "10px 14px",
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {nextMonth
-                      ? `⚠️ Compra após o fechamento (dia ${card.closingDay}) — será lançada na fatura do próximo mês`
-                      : `✅ Será lançada na fatura do mês atual (fecha dia ${card.closingDay})`}
-                  </div>
-                );
-              })()}
-
-            {/* Categoria */}
             <div>
               <div
                 style={{
@@ -1251,7 +1138,6 @@ export default function AddModal({
               </div>
             </div>
 
-            {/* Subcategoria */}
             {cat && cat.subcategories.length > 0 && (
               <div>
                 <div
@@ -1287,27 +1173,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Observações */}
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
-                Observações
-              </div>
-              <input
-                style={S.input}
-                placeholder="Opcional..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-
-            {/* Erro */}
             {error && (
               <div
                 style={{
@@ -1326,7 +1191,6 @@ export default function AddModal({
               </div>
             )}
 
-            {/* Ações */}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button style={{ ...S.btn("ghost"), flex: 1 }} onClick={onClose}>
                 Cancelar

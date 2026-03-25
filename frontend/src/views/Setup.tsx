@@ -21,12 +21,14 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
   const [activeTab, setActiveTab] = useState<"categories" | "profile" | "cards">("profile");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // CORREÇÃO: Removidas as aspas soltas após useState("") que causavam
+  // erro de sintaxe TypeScript: `const [catError, setCatError] = useState("");''`
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatSlug, setNewCatSlug] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("📦");
   const [newCatColor, setNewCatColor] = useState("#5A8FE8");
-  const [catError, setCatError] = useState("");''
+  const [catError, setCatError] = useState("");
   const [catLoading, setCatLoading] = useState(false);
 
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -75,8 +77,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       setNewCatColor("#5A8FE8");
       setShowNewCat(false);
       onCategoriesChange();
-    } catch (err: any) {
-      setCatError(err.message || "Erro ao criar categoria.");
+    } catch (err: unknown) {
+      setCatError(err instanceof Error ? err.message : "Erro ao criar categoria.");
     } finally {
       setCatLoading(false);
     }
@@ -92,8 +94,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       });
       setEditingCat(null);
       onCategoriesChange();
-    } catch (err: any) {
-      alert(err.message || "Erro ao editar categoria.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erro ao editar categoria.");
     }
   };
 
@@ -102,8 +104,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
     try {
       await api.deleteCategory(cat.id);
       onCategoriesChange();
-    } catch (err: any) {
-      alert(err.message || "Erro ao deletar categoria.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erro ao deletar categoria.");
     }
   };
 
@@ -126,8 +128,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       setNewSubIcon("📌");
       setNewSubCatId(null);
       onCategoriesChange();
-    } catch (err: any) {
-      setSubError(err.message || "Erro ao criar subcategoria.");
+    } catch (err: unknown) {
+      setSubError(err instanceof Error ? err.message : "Erro ao criar subcategoria.");
     } finally {
       setSubLoading(false);
     }
@@ -142,8 +144,8 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
     try {
       await api.deleteSubcategory(categoryId, subId);
       onCategoriesChange();
-    } catch (err: any) {
-      alert(err.message || "Erro ao deletar subcategoria.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erro ao deletar subcategoria.");
     }
   };
 
@@ -157,14 +159,13 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       setEditingSubId(null);
       setEditingSubCatId(null);
       onCategoriesChange();
-    } catch (err: any) {
-      alert(err.message || "Erro ao editar subcategoria.");
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erro ao editar subcategoria.");
     }
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Cabeçalho com tabs */}
       <div
         style={{
           display: "flex",
@@ -190,7 +191,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
           [
             { key: "profile", label: "👤 Perfil" },
             { key: "categories", label: "🗂️ Categorias" },
-            { key: "cards", label: "💳 Cartões" }, 
+            { key: "cards", label: "💳 Cartões" },
           ] as const
         ).map((tab) => (
           <button
@@ -224,14 +225,14 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
       )}
 
       {/* Tab: Cartões */}
-{activeTab === "cards" && (
-  <CreditCardManager
-    cards={cards}
-    onCreate={createCard}
-    onUpdate={updateCard}
-    onDelete={deleteCard}
-  />
-)}
+      {activeTab === "cards" && (
+        <CreditCardManager
+          cards={cards}
+          onCreate={createCard}
+          onUpdate={updateCard}
+          onDelete={deleteCard}
+        />
+      )}
 
       {/* Tab: Categorias */}
       {activeTab === "categories" && (
@@ -248,22 +249,13 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
             </button>
           </div>
 
-          {/* Form nova categoria */}
           {showNewCat && (
             <div style={{ ...S.card, borderColor: "var(--accent-blue)" }}>
               <div style={S.sectionTitle}>Nova Categoria</div>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 14 }}
-              >
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <div style={S.grid2}>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-muted)",
-                        marginBottom: 6,
-                      }}
-                    >
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                       Nome *
                     </div>
                     <input
@@ -277,13 +269,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                     />
                   </div>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-muted)",
-                        marginBottom: 6,
-                      }}
-                    >
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                       Slug (identificador)
                     </div>
                     <input
@@ -296,26 +282,14 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 </div>
 
                 <div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text-muted)",
-                      marginBottom: 6,
-                    }}
-                  >
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                     Ícone
                   </div>
                   <EmojiPicker value={newCatIcon} onChange={setNewCatIcon} />
                 </div>
 
                 <div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text-muted)",
-                      marginBottom: 6,
-                    }}
-                  >
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                     Cor
                   </div>
                   <ColorPicker value={newCatColor} onChange={setNewCatColor} />
@@ -355,7 +329,6 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
             </div>
           )}
 
-          {/* Lista de categorias */}
           {categories.map((cat) => (
             <div key={cat.id} style={S.card}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -374,28 +347,16 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                   {cat.icon}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
                     {cat.name}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                     {cat.subcategories.length} subcategorias
                   </div>
                 </div>
-                <div
-                  style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}
-                >
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" as const }}>
                   <button
-                    style={{
-                      ...S.btn("ghost"),
-                      padding: "6px 12px",
-                      fontSize: 12,
-                    }}
+                    style={{ ...S.btn("ghost"), padding: "6px 12px", fontSize: 12 }}
                     onClick={() => {
                       setEditingCat(cat);
                       setEditCatName(cat.name);
@@ -406,23 +367,13 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                     ✏️ Editar
                   </button>
                   <button
-                    style={{
-                      ...S.btn("ghost"),
-                      padding: "6px 12px",
-                      fontSize: 12,
-                    }}
-                    onClick={() =>
-                      setExpandedId(expandedId === cat.id ? null : cat.id)
-                    }
+                    style={{ ...S.btn("ghost"), padding: "6px 12px", fontSize: 12 }}
+                    onClick={() => setExpandedId(expandedId === cat.id ? null : cat.id)}
                   >
                     {expandedId === cat.id ? "▲ Fechar" : "▼ Subcategorias"}
                   </button>
                   <button
-                    style={{
-                      ...S.btn("danger"),
-                      padding: "6px 12px",
-                      fontSize: 12,
-                    }}
+                    style={{ ...S.btn("danger"), padding: "6px 12px", fontSize: 12 }}
                     onClick={() => handleDeleteCategory(cat)}
                   >
                     🗑️
@@ -430,7 +381,6 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 </div>
               </div>
 
-              {/* Subcategorias */}
               {expandedId === cat.id && (
                 <div
                   style={{
@@ -439,9 +389,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                     borderTop: "1px solid var(--border-subtle)",
                   }}
                 >
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                  >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {cat.subcategories.map((sub) => (
                       <div
                         key={sub.id}
@@ -456,12 +404,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                       >
                         <span style={{ fontSize: 16 }}>{sub.icon}</span>
                         <div style={{ flex: 1 }}>
-                          <span
-                            style={{
-                              fontSize: 13,
-                              color: "var(--text-primary)",
-                            }}
-                          >
+                          <span style={{ fontSize: 13, color: "var(--text-primary)" }}>
                             {sub.name}
                           </span>
                         </div>
@@ -485,9 +428,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                           ✏️
                         </button>
                         <button
-                          onClick={() =>
-                            handleDeleteSubcategory(cat.id, sub.id, sub.name)
-                          }
+                          onClick={() => handleDeleteSubcategory(cat.id, sub.id, sub.name)}
                           style={{
                             background: "none",
                             border: "none",
@@ -503,7 +444,6 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                       </div>
                     ))}
 
-                    {/* Form nova subcategoria */}
                     {newSubCatId === cat.id ? (
                       <div
                         style={{
@@ -517,13 +457,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                       >
                         <div style={S.grid2}>
                           <div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-muted)",
-                                marginBottom: 4,
-                              }}
-                            >
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
                               Nome *
                             </div>
                             <input
@@ -537,13 +471,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                             />
                           </div>
                           <div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "var(--text-muted)",
-                                marginBottom: 4,
-                              }}
-                            >
+                            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
                               Slug
                             </div>
                             <input
@@ -556,19 +484,10 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                         </div>
 
                         <div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "var(--text-muted)",
-                              marginBottom: 4,
-                            }}
-                          >
+                          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
                             Ícone
                           </div>
-                          <EmojiPicker
-                            value={newSubIcon}
-                            onChange={setNewSubIcon}
-                          />
+                          <EmojiPicker value={newSubIcon} onChange={setNewSubIcon} />
                         </div>
 
                         {subError && (
@@ -588,21 +507,13 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
 
                         <div style={{ display: "flex", gap: 8 }}>
                           <button
-                            style={{
-                              ...S.btn("ghost"),
-                              flex: 1,
-                              padding: "8px",
-                            }}
+                            style={{ ...S.btn("ghost"), flex: 1, padding: "8px" }}
                             onClick={() => setNewSubCatId(null)}
                           >
                             Cancelar
                           </button>
                           <button
-                            style={{
-                              ...S.btn("primary"),
-                              flex: 2,
-                              padding: "8px",
-                            }}
+                            style={{ ...S.btn("primary"), flex: 2, padding: "8px" }}
                             onClick={() => handleCreateSubcategory(cat.id)}
                             disabled={subLoading}
                           >
@@ -612,11 +523,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                       </div>
                     ) : (
                       <button
-                        style={{
-                          ...S.btn("ghost"),
-                          fontSize: 12,
-                          padding: "8px",
-                        }}
+                        style={{ ...S.btn("ghost"), fontSize: 12, padding: "8px" }}
                         onClick={() => {
                           setNewSubCatId(cat.id);
                           setSubError("");
@@ -647,9 +554,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 marginBottom: 20,
               }}
             >
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>
-                Editar Categoria
-              </h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700 }}>Editar Categoria</h3>
               <button
                 onClick={() => setEditingCat(null)}
                 style={{
@@ -665,13 +570,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                   Nome
                 </div>
                 <input
@@ -681,25 +580,13 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 />
               </div>
               <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                   Ícone
                 </div>
                 <EmojiPicker value={editCatIcon} onChange={setEditCatIcon} />
               </div>
               <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                   Cor
                 </div>
                 <ColorPicker value={editCatColor} onChange={setEditCatColor} />
@@ -734,9 +621,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 marginBottom: 20,
               }}
             >
-              <h3 style={{ fontSize: 18, fontWeight: 700 }}>
-                Editar Subcategoria
-              </h3>
+              <h3 style={{ fontSize: 18, fontWeight: 700 }}>Editar Subcategoria</h3>
               <button
                 onClick={() => setEditingSubId(null)}
                 style={{
@@ -752,13 +637,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                   Nome
                 </div>
                 <input
@@ -768,13 +647,7 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
                 />
               </div>
               <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
                   Ícone
                 </div>
                 <EmojiPicker value={editSubIcon} onChange={setEditSubIcon} />
@@ -800,5 +673,3 @@ export default function Setup({ categories, onCategoriesChange }: SetupProps) {
     </div>
   );
 }
-
-// ─── Profile Section ──────────────────────────────────────────────────────────

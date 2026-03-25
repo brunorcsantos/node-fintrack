@@ -25,6 +25,7 @@ model User {
   creditCards   CreditCard[]
   creditCardTransactions CreditCardTransaction[]
   creditCardInvoices     CreditCardInvoice[]
+  refreshTokens RefreshToken[]
 }
 
 model Category {
@@ -229,3 +230,17 @@ model CreditCardInvoice {
   @@index([userId, paid])
 }
 
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}

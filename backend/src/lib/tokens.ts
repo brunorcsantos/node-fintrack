@@ -33,6 +33,7 @@ export function generateAccessToken(
 ): string {
   return (app as FastifyInstance & { accessJwt: { sign: (p: object, o: object) => string } })
     .accessJwt.sign(payload, { expiresIn: TOKEN_EXPIRY.access });
+    console.log(app)
 }
 
 export function generateRefreshToken(

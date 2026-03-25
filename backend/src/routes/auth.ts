@@ -147,7 +147,7 @@ export async function authRoutes(app: FastifyInstance) {
       // Verifica assinatura e expiração do token usando o namespace "refresh"
       let payload: { sub: string };
       try {
-        payload = await req.refreshVerify() as { sub: string };
+        payload = app.jwt.verify<{ sub: string }>(refreshToken);
       } catch {
         return reply.status(401).send({
           error: "Refresh token inválido ou expirado.",

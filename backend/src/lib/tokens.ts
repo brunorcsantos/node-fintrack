@@ -31,23 +31,22 @@ export function generateAccessToken(
   app: FastifyInstance,
   payload: { sub: string; email: string },
 ): string {
-  return (app as FastifyInstance & { accessJwt: { sign: (p: object, o: object) => string } })
-    .accessJwt.sign(payload, { expiresIn: TOKEN_EXPIRY.access });
-    console.log(app)
+  return (app as FastifyInstance & { accessSign: (p: object, o: object) => string })
+    .accessSign(payload, { expiresIn: TOKEN_EXPIRY.access });
 }
 
 export function generateRefreshToken(
   app: FastifyInstance,
   payload: { sub: string },
 ): string {
-  return (app as FastifyInstance & { refreshJwt: { sign: (p: object, o: object) => string } })
-    .refreshJwt.sign(payload, { expiresIn: TOKEN_EXPIRY.refresh });
+  return (app as FastifyInstance & { refreshSign: (p: object, o: object) => string })
+    .refreshSign(payload, { expiresIn: TOKEN_EXPIRY.refresh });
 }
 
 export function verifyRefreshToken(
   app: FastifyInstance,
   token: string,
 ): { sub: string } {
-  return (app as FastifyInstance & { refreshJwt: { verify: (t: string) => unknown } })
-    .refreshJwt.verify(token) as { sub: string };
+  return (app as FastifyInstance & { refreshVerify: (t: string) => unknown })
+    .refreshVerify(token) as { sub: string };
 }

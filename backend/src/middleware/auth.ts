@@ -1,11 +1,7 @@
 // src/middleware/auth.ts
 import { FastifyRequest, FastifyReply } from "fastify";
 
-declare module "fastify" {
-  interface FastifyRequest {
-    accessVerify(): Promise<void>;
-  }
-}
+
 
 /**
  * Verifica o access token usando o namespace "access" registrado no server.ts.
@@ -13,7 +9,7 @@ declare module "fastify" {
  */
 export async function authenticate(req: FastifyRequest, reply: FastifyReply) {
   try {
-    await req.accessVerify();
+    await (req as any).accessVerify();
   } catch {
     reply.status(401).send({ error: "Token inválido ou expirado." });
   }

@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
 
@@ -19,20 +19,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Ao carregar o app, verifica se já existe token salvo
   useEffect(() => {
-    const token = api.loadToken();
-    if (token) {
+    const accessToken = api.loadToken();
+    if (accessToken) {
       api
         .me()
         .then(setUser)
-        .catch(() => api.setToken(null))
+        .catch(() => api.clearTokens())
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
 
-    // Escuta evento de logout por token expirado
     const handleAuthLogout = () => {
       setUser(null);
       setLoading(false);
@@ -42,25 +40,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { token, user } = await api.login({ email, password });
-    api.setToken(token);
+    const { accessToken, refreshToken, user } = await api.login({ email, password });
+    api.setTokens(accessToken, refreshToken);
     setUser(user);
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const { token, user } = await api.register({ name, email, password });
-    api.setToken(token);
+    const { accessToken, refreshToken, user } = await api.register({ name, email, password });
+    api.setTokens(accessToken, refreshToken);
     setUser(user);
   };
 
-  const logout = () => {
-    api.setToken(null);
+  const logout = async () => {
+    const refreshToken = localStorage.getItem("fintrack_refresh_token");
+    if (refreshToken) {
+      await api.logout(refreshToken).catch(() => {});
+    }
+    api.clearTokens();
     setUser(null);
   };
 
-  const updateUser = (updatedUser: User) => {
-    setUser(updatedUser);
-  };
+  const updateUser = (updatedUser: User) => setUser(updatedUser);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>

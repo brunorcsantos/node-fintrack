@@ -105,6 +105,7 @@ async function main() {
     namespace: "access",
     jwtVerify: "accessVerify",
     jwtSign: "accessSign",
+    sign: { expiresIn: "15m" }
   });
 
   // Refresh token — secret separado, usado apenas em /auth/refresh
@@ -115,6 +116,7 @@ async function main() {
     namespace: "refresh",
     jwtVerify: "refreshVerify",
     jwtSign: "refreshSign",
+    sign: { expiresIn: "30d" }
   });
 
   // Rotas

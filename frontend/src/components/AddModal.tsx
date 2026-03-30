@@ -138,8 +138,6 @@ export default function AddModal({
     });
   };
 
-  // CORREÇÃO: handleSubmitRecurring agora chama onAddRecurring (estava chamando
-  // onAddCardTransaction por engano, fazendo o modo recorrente nunca funcionar).
   const handleSubmitRecurring = async () => {
     setError("");
     if (!recurring.description.trim()) {
@@ -1096,10 +1094,6 @@ export default function AddModal({
                   </div>
                 ) : (
                   cards.map((card) => {
-                    const selectedCard = cards.find(
-                      (c) => c.id === selectedCardId,
-                    );
-                    // Aviso de fatura baseado no closingDay
                     const getInvoiceWarning = () => {
                       if (!selectedCardId || card.id !== selectedCardId)
                         return null;

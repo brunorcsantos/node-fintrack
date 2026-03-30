@@ -53,6 +53,9 @@ export default function AddModal({
     "single",
   );
   const [selectedCardId, setSelectedCardId] = useState("");
+  const [cardSubMode, setCardSubMode] = useState<
+    "once" | "recurring_indefinite" | "recurring_installments"
+  >("once");
 
   // Lançamento único
   const [type, setType] = useState<"expense" | "income">(
@@ -79,6 +82,12 @@ export default function AddModal({
   const [recurring, setRecurring] = useState<RecurringInput>(EMPTY_RECURRING);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [cardRecurring, setCardRecurring] = useState<RecurringInput>({
+    ...EMPTY_RECURRING,
+    type: "expense",
+    creditCardId: undefined,
+  });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -195,6 +204,49 @@ export default function AddModal({
         categoryId: effectiveCategoryId,
         subcategoryId: subcategoryId || undefined,
         notes,
+      });
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmitCardRecurring = async () => {
+    setError("");
+    if (!selectedCardId) {
+      setError("Selecione um cartão.");
+      return;
+    }
+    if (!cardRecurring.description.trim()) {
+      setError("Informe a descrição.");
+      return;
+    }
+    if (!cardRecurring.categoryId) {
+      setError("Selecione uma categoria.");
+      return;
+    }
+    if (!cardRecurring.amount) {
+      setError("Valor da assinatura é obrigatório.");
+      return;
+    }
+    if (cardSubMode === "recurring_installments") {
+      if (!cardRecurring.installments || cardRecurring.installments < 2) {
+        setError("Informe o número de parcelas (mínimo 2).");
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      await onAddRecurring({
+        ...cardRecurring,
+        creditCardId: selectedCardId,
+        mode:
+          cardSubMode === "recurring_installments"
+            ? "installments"
+            : "indefinite",
       });
       onClose();
     } catch (err: unknown) {
@@ -967,6 +1019,56 @@ export default function AddModal({
         {/* ── MODO CARTÃO ──────────────────────────────────────────────── */}
         {modalMode === "card" && !isEditing && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Submodos do cartão */}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                background: "var(--bg-elevated)",
+                borderRadius: "var(--radius-md)",
+                padding: 4,
+              }}
+            >
+              {(
+                [
+                  { key: "once", label: "🛒 Único" },
+                  { key: "recurring_indefinite", label: "♾️ Mensal" },
+                  { key: "recurring_installments", label: "🔢 Parcelas" },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => {
+                    setCardSubMode(m.key);
+                    setError("");
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "9px",
+                    borderRadius: "var(--radius-sm)",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    transition: "all 0.15s",
+                    background:
+                      cardSubMode === m.key
+                        ? "var(--bg-surface)"
+                        : "transparent",
+                    color:
+                      cardSubMode === m.key
+                        ? "var(--text-primary)"
+                        : "var(--text-muted)",
+                    boxShadow:
+                      cardSubMode === m.key ? "var(--shadow-sm)" : "none",
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Seleção de cartão */}
             <div>
               <div
                 style={{
@@ -993,185 +1095,508 @@ export default function AddModal({
                     Cartões.
                   </div>
                 ) : (
-                  cards.map((card) => (
-                    <button
-                      key={card.id}
-                      onClick={() => setSelectedCardId(card.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: "10px 14px",
-                        borderRadius: "var(--radius-md)",
-                        border: "2px solid",
-                        borderColor:
-                          selectedCardId === card.id
-                            ? card.color
-                            : "var(--border-default)",
-                        background:
-                          selectedCardId === card.id
-                            ? card.color + "11"
-                            : "transparent",
-                        cursor: "pointer",
-                        transition: "all 0.15s",
-                        textAlign: "left" as const,
-                      }}
-                    >
-                      <span style={{ fontSize: 20 }}>{card.icon}</span>
-                      <div>
-                        <div
+                  cards.map((card) => {
+                    const selectedCard = cards.find(
+                      (c) => c.id === selectedCardId,
+                    );
+                    // Aviso de fatura baseado no closingDay
+                    const getInvoiceWarning = () => {
+                      if (!selectedCardId || card.id !== selectedCardId)
+                        return null;
+                      const refDay =
+                        cardSubMode === "once"
+                          ? new Date(date).getUTCDate()
+                          : cardRecurring.dayOfMonth;
+                      if (refDay > card.closingDay) {
+                        return `⚠️ Cai na fatura do próximo mês (compra após dia ${card.closingDay})`;
+                      }
+                      return `✅ Cai na fatura deste mês`;
+                    };
+                    const warning = getInvoiceWarning();
+                    return (
+                      <div key={card.id}>
+                        <button
+                          onClick={() => {
+                            setSelectedCardId(card.id);
+                            setCardRecurring((prev) => ({
+                              ...prev,
+                              creditCardId: card.id,
+                            }));
+                          }}
                           style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: "var(--text-primary)",
+                            width: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            padding: "10px 14px",
+                            borderRadius: "var(--radius-md)",
+                            border: "2px solid",
+                            borderColor:
+                              selectedCardId === card.id
+                                ? card.color
+                                : "var(--border-default)",
+                            background:
+                              selectedCardId === card.id
+                                ? card.color + "11"
+                                : "transparent",
+                            cursor: "pointer",
+                            transition: "all 0.15s",
+                            textAlign: "left" as const,
                           }}
                         >
-                          {card.name}
-                        </div>
-                        <div
-                          style={{ fontSize: 11, color: "var(--text-muted)" }}
-                        >
-                          Fecha dia {card.closingDay} · Vence dia {card.dueDay}
-                        </div>
+                          <span style={{ fontSize: 20 }}>{card.icon}</span>
+                          <div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: "var(--text-primary)",
+                              }}
+                            >
+                              {card.name}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--text-muted)",
+                              }}
+                            >
+                              Fecha dia {card.closingDay} · Vence dia{" "}
+                              {card.dueDay}
+                            </div>
+                          </div>
+                        </button>
+                        {warning && selectedCardId === card.id && (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: warning.startsWith("⚠️")
+                                ? "var(--accent-orange)"
+                                : "var(--accent-green)",
+                              marginTop: 4,
+                              paddingLeft: 4,
+                            }}
+                          >
+                            {warning}
+                          </div>
+                        )}
                       </div>
-                    </button>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
 
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
-                Descrição *
-              </div>
-              <input
-                style={S.input}
-                placeholder="Ex: Compras no Mercado Livre"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                    fontWeight: 600,
-                  }}
-                >
-                  Valor (R$) *
-                </div>
-                <input
-                  style={S.input}
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0,00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </div>
-              <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                    fontWeight: 600,
-                  }}
-                >
-                  Data da compra *
-                </div>
-                <input
-                  style={S.input}
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-muted)",
-                  marginBottom: 6,
-                  fontWeight: 600,
-                }}
-              >
-                Categoria
-              </div>
-              <div
-                style={{ display: "flex", flexWrap: "wrap" as const, gap: 8 }}
-              >
-                {categories
-                  .filter((c) => c.slug !== "receita")
-                  .map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        setCategoryId(c.id);
-                        setSubcategoryId("");
-                      }}
-                      style={pillStyle(effectiveCategoryId === c.id, c.color)}
-                    >
-                      <span>{c.icon}</span>
-                      <span>{c.name}</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            {cat && cat.subcategories.length > 0 && (
-              <div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 6,
-                    fontWeight: 600,
-                  }}
-                >
-                  Subcategoria
-                </div>
-                <div
-                  style={{ display: "flex", flexWrap: "wrap" as const, gap: 6 }}
-                >
-                  <button
-                    onClick={() => setSubcategoryId("")}
-                    style={pillStyle(!subcategoryId)}
+            {/* ── Submodo: Único ── */}
+            {cardSubMode === "once" && (
+              <>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
                   >
-                    Todas
-                  </button>
-                  {cat.subcategories.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSubcategoryId(s.id)}
-                      style={pillStyle(subcategoryId === s.id)}
-                    >
-                      <span>{s.icon}</span>
-                      <span>{s.name}</span>
-                    </button>
-                  ))}
+                    Descrição *
+                  </div>
+                  <input
+                    style={S.input}
+                    placeholder="Ex: Compras no Mercado Livre"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
                 </div>
-              </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Valor (R$) *
+                    </div>
+                    <input
+                      style={S.input}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0,00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Data da compra *
+                    </div>
+                    <input
+                      style={S.input}
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Categoria
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap" as const,
+                      gap: 8,
+                    }}
+                  >
+                    {categories
+                      .filter((c) => c.slug !== "receita")
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setCategoryId(c.id);
+                            setSubcategoryId("");
+                          }}
+                          style={pillStyle(
+                            effectiveCategoryId === c.id,
+                            c.color,
+                          )}
+                        >
+                          <span>{c.icon}</span>
+                          <span>{c.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                {cat && cat.subcategories.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Subcategoria
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap" as const,
+                        gap: 6,
+                      }}
+                    >
+                      <button
+                        onClick={() => setSubcategoryId("")}
+                        style={pillStyle(!subcategoryId)}
+                      >
+                        Todas
+                      </button>
+                      {cat.subcategories.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => setSubcategoryId(s.id)}
+                          style={pillStyle(subcategoryId === s.id)}
+                        >
+                          <span>{s.icon}</span>
+                          <span>{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Submodo: Mensal ou Parcelas ── */}
+            {(cardSubMode === "recurring_indefinite" ||
+              cardSubMode === "recurring_installments") && (
+              <>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Descrição *
+                  </div>
+                  <input
+                    style={S.input}
+                    placeholder={
+                      cardSubMode === "recurring_installments"
+                        ? "Ex: iPhone 16 Pro"
+                        : "Ex: Netflix"
+                    }
+                    value={cardRecurring.description}
+                    onChange={(e) =>
+                      setCardRecurring({
+                        ...cardRecurring,
+                        description: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Valor (R$){" "}
+                    {cardSubMode === "recurring_installments"
+                      ? "por parcela *"
+                      : "da assinatura *"}
+                  </div>
+                  <input
+                    style={S.input}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0,00"
+                    value={cardRecurring.amount ?? ""}
+                    onChange={(e) =>
+                      setCardRecurring({
+                        ...cardRecurring,
+                        amount: e.target.value
+                          ? Number(e.target.value)
+                          : undefined,
+                      })
+                    }
+                  />
+                </div>
+                {cardSubMode === "recurring_installments" && (
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Número de parcelas *
+                    </div>
+                    <input
+                      style={S.input}
+                      type="number"
+                      min="2"
+                      placeholder="Ex: 12"
+                      value={cardRecurring.installments ?? ""}
+                      onChange={(e) =>
+                        setCardRecurring({
+                          ...cardRecurring,
+                          installments: e.target.value
+                            ? Number(e.target.value)
+                            : undefined,
+                        })
+                      }
+                    />
+                    {cardRecurring.amount && cardRecurring.installments && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                          marginTop: 6,
+                        }}
+                      >
+                        Total:{" "}
+                        <strong style={{ color: "var(--text-primary)" }}>
+                          R${" "}
+                          {(
+                            cardRecurring.amount * cardRecurring.installments
+                          ).toLocaleString("pt-BR", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Dia do mês *
+                    </div>
+                    <input
+                      style={S.input}
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={cardRecurring.dayOfMonth}
+                      onChange={(e) =>
+                        setCardRecurring({
+                          ...cardRecurring,
+                          dayOfMonth: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "var(--text-muted)",
+                        marginBottom: 6,
+                        fontWeight: 600,
+                      }}
+                    >
+                      Data de início *
+                    </div>
+                    <input
+                      style={S.input}
+                      type="date"
+                      value={cardRecurring.startDate}
+                      onChange={(e) =>
+                        setCardRecurring({
+                          ...cardRecurring,
+                          startDate: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-muted)",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Categoria *
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap" as const,
+                      gap: 8,
+                    }}
+                  >
+                    {categories
+                      .filter((c) => c.slug !== "receita")
+                      .map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() =>
+                            setCardRecurring({
+                              ...cardRecurring,
+                              categoryId: c.id,
+                              subcategoryId: undefined,
+                            })
+                          }
+                          style={pillStyle(
+                            cardRecurring.categoryId === c.id,
+                            c.color,
+                          )}
+                        >
+                          <span>{c.icon}</span>
+                          <span>{c.name}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                {(() => {
+                  const cat2 = categories.find(
+                    (c) => c.id === cardRecurring.categoryId,
+                  );
+                  return cat2 && cat2.subcategories.length > 0 ? (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-muted)",
+                          marginBottom: 6,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Subcategoria
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap" as const,
+                          gap: 6,
+                        }}
+                      >
+                        <button
+                          onClick={() =>
+                            setCardRecurring({
+                              ...cardRecurring,
+                              subcategoryId: undefined,
+                            })
+                          }
+                          style={pillStyle(!cardRecurring.subcategoryId)}
+                        >
+                          Todas
+                        </button>
+                        {cat2.subcategories.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() =>
+                              setCardRecurring({
+                                ...cardRecurring,
+                                subcategoryId: s.id,
+                              })
+                            }
+                            style={pillStyle(
+                              cardRecurring.subcategoryId === s.id,
+                            )}
+                          >
+                            <span>{s.icon}</span>
+                            <span>{s.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </>
             )}
 
             {error && (
@@ -1202,10 +1627,20 @@ export default function AddModal({
                   flex: 2,
                   opacity: saving ? 0.7 : 1,
                 }}
-                onClick={handleSubmitCard}
+                onClick={
+                  cardSubMode === "once"
+                    ? handleSubmitCard
+                    : handleSubmitCardRecurring
+                }
                 disabled={saving || cards.length === 0}
               >
-                {saving ? "Salvando..." : "💳 Lançar no Cartão"}
+                {saving
+                  ? "Salvando..."
+                  : cardSubMode === "once"
+                    ? "💳 Lançar no Cartão"
+                    : cardSubMode === "recurring_installments"
+                      ? `🔢 Criar ${cardRecurring.installments || ""}x Parcelas`
+                      : "♾️ Criar Assinatura Mensal"}
               </button>
             </div>
           </div>

@@ -35,7 +35,7 @@ export default function CreditCardManager({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  console.log(form)
+  // console.log(form)
 
   const openCreate = () => {
     setForm(EMPTY_FORM);

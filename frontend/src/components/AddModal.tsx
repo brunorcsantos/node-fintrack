@@ -34,6 +34,7 @@ const EMPTY_RECURRING: RecurringInput = {
   endDate: undefined,
   mode: "indefinite",
   installments: undefined,
+  creditCardId: undefined,
 };
 
 export default function AddModal({

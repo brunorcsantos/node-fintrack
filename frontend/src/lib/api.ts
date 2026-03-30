@@ -60,8 +60,10 @@ export interface Recurring {
   installments?: number;
   categoryId: string;
   subcategoryId?: string;
+  creditCardId?: string;
   category: Category;
   subcategory?: Subcategory;
+  creditCard?: CreditCard;
 }
 export type RecurringInput = {
   description: string;
@@ -75,7 +77,9 @@ export type RecurringInput = {
   endDate?: string;
   mode: "indefinite" | "installments";
   installments?: number;
+  creditCardId?: string;
 };
+
 export interface Notification {
   id: string;
   userId: string;
@@ -449,6 +453,36 @@ class ApiClient {
     return this.request<Summary>(`/transactions/summary${qs}`);
   }
 
+  async exportTransactionsCsv(params: {
+    month?: string;
+    categoryId?: string;
+    type?: string;
+    search?: string;
+  }): Promise<Blob> {
+    const qs = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v)
+        .map(([k, v]) => [k, String(v)]),
+    );
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.accessToken)
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+
+    const res = await fetch(`${BASE_URL}/transactions/export?${qs}`, {
+      headers,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    return res.blob();
+  }
+
   // ── Budgets ─────────────────────────────────────────────────────────────────
 
   async getBudgets(month?: string) {
@@ -507,6 +541,10 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data || {}),
     });
+  }
+
+  async processCardRecurring(): Promise<{ processed: number; ids: string[] }> {
+    return this.request("/recurring/process-card", { method: "POST" });
   }
 
   // ── Notifications ───────────────────────────────────────────────────────────

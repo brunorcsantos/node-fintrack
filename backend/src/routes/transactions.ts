@@ -175,6 +175,95 @@ export async function transactionRoutes(app: FastifyInstance) {
     },
   );
 
+  // GET /transactions/export
+  app.get(
+    "/transactions/export",
+    {
+      schema: {
+        tags: ["Transactions"],
+        summary: "Exportar transações em CSV",
+        security,
+        querystring: z.object({
+          month: z
+            .string()
+            .regex(/^\d{4}-\d{2}$/)
+            .optional(),
+          categoryId: z.string().uuid().optional(),
+          type: z.enum(["income", "expense"]).optional(),
+          search: z.string().optional(),
+        }),
+      },
+      onRequest: [authenticate],
+    },
+    async (req, reply) => {
+      const { sub: userId } = req.user as { sub: string };
+      const { month, categoryId, type, search } = req.query as {
+        month?: string;
+        categoryId?: string;
+        type?: "income" | "expense";
+        search?: string;
+      };
+
+      const where: Record<string, unknown> = { userId };
+
+      if (month) {
+        const [year, m] = month.split("-").map(Number);
+        where.date = {
+          gte: new Date(Date.UTC(year, m - 1, 1)),
+          lt: new Date(Date.UTC(year, m, 1)),
+        };
+      }
+      if (categoryId) where.categoryId = categoryId;
+      if (type) where.type = type;
+      if (search) {
+        where.OR = [
+          { description: { contains: search, mode: "insensitive" } },
+          { notes: { contains: search, mode: "insensitive" } },
+        ];
+      }
+
+      const transactions = await prisma.transaction.findMany({
+        where,
+        include: { category: true, subcategory: true },
+        orderBy: { date: "desc" },
+      });
+
+      // ── Monta CSV ─────────────────────────────────────────────────────────
+      const escape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+      const header = [
+        "Data",
+        "Descrição",
+        "Tipo",
+        "Categoria",
+        "Subcategoria",
+        "Valor (R$)",
+        "Observações",
+      ];
+
+      const rows = transactions.map((tx) => [
+        new Date(tx.date).toLocaleDateString("pt-BR"),
+        escape(tx.description),
+        tx.type === "income" ? "Receita" : "Despesa",
+        escape(tx.category?.name ?? ""),
+        escape(tx.subcategory?.name ?? ""),
+        Number(tx.amount).toFixed(2).replace(".", ","),
+        escape(tx.notes ?? ""),
+      ]);
+
+      const csv = [header.join(";"), ...rows.map((r) => r.join(";"))].join(
+        "\r\n",
+      );
+
+      const filename = `fintrack-${month ?? "todas"}.csv`;
+
+      reply
+        .header("Content-Type", "text/csv; charset=utf-8")
+        .header("Content-Disposition", `attachment; filename="${filename}"`)
+        .send("\uFEFF" + csv); // BOM para Excel abrir com acentos corretamente
+    },
+  );
+
   // GET /transactions/summary
   app.get(
     "/transactions/summary",
@@ -213,9 +302,7 @@ export async function transactionRoutes(app: FastifyInstance) {
           where,
           _sum: { amount: true },
         }),
-        prisma.$queryRaw<
-          { month: string; type: string; total: number }[]
-        >`
+        prisma.$queryRaw<{ month: string; type: string; total: number }[]>`
           SELECT
             TO_CHAR(date, 'YYYY-MM') as month,
             type,

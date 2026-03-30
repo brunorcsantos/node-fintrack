@@ -36,7 +36,9 @@ export default function AuthenticatedApp() {
   );
   const [filterCategory, setFilterCategory] = useState("all");
 
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
+  const [filterType, setFilterType] = useState<"all" | "income" | "expense">(
+    "all",
+  );
   const [filterCategoryLocal, setFilterCategoryLocal] = useState("all");
   const [filterSubcategory, setFilterSubcategory] = useState("all");
   const [search, setSearch] = useState("");
@@ -54,6 +56,8 @@ export default function AuthenticatedApp() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  
+
   const {
     categories,
     loading: loadingCats,
@@ -69,6 +73,14 @@ export default function AuthenticatedApp() {
   // - estados dessincronizados entre Dashboard (alerts) e Transactions (lista)
   // - confirmRecurring no Dashboard não atualizava a lista em Transactions
   const recurringState = useRecurring();
+
+  const { processCardRecurring } = recurringState;
+
+  useEffect(() => {
+    processCardRecurring();
+    const interval = setInterval(processCardRecurring, 60 * 60 * 1000); // 1 hora
+    return () => clearInterval(interval);
+  }, [processCardRecurring]);
 
   const {
     upcomingInvoices,
@@ -245,6 +257,7 @@ export default function AuthenticatedApp() {
                 onAddNew={() => setShowAddModal(true)}
                 // Passa o estado compartilhado em vez de criar nova instância
                 recurringState={recurringState}
+                filterMonth={filterMonth}
               />
             )}
             {view === "budgets" && (

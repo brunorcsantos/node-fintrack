@@ -38,6 +38,18 @@ export function useRecurring() {
     [fetchAll],
   );
 
+  const processCardRecurring = useCallback(async () => {
+    try {
+      const result = await api.processCardRecurring();
+      if (result.processed > 0) {
+        await fetchAll(); // Recarrega para refletir lastCreatedAt atualizado
+      }
+      return result;
+    } catch (err: any) {
+      console.error("Erro ao processar recorrentes do cartão:", err);
+    }
+  }, [fetchAll]);
+
   const updateRecurring = useCallback(
     async (id: string, data: Partial<RecurringInput>) => {
       const r = await api.updateRecurring(id, data);
@@ -72,5 +84,6 @@ export function useRecurring() {
     updateRecurring,
     deleteRecurring,
     confirmRecurring,
+    processCardRecurring
   };
 }

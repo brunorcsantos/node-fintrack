@@ -119,11 +119,13 @@ model RecurringTransaction {
   lastCreatedAt   DateTime?
   mode            RecurringMode @default(indefinite)
   installments    Int?      // número de parcelas (apenas para mode = installments)
+  creditCardId    String?
   createdAt       DateTime  @default(now())
 
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   category      Category    @relation(fields: [categoryId], references: [id])
   subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  creditCard    CreditCard? @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
 
   @@index([userId, active])
 }
@@ -185,6 +187,7 @@ model CreditCard {
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions    CreditCardTransaction[]
   invoices        CreditCardInvoice[]
+  recurring       RecurringTransaction[]
 
   @@index([userId, active])
 }

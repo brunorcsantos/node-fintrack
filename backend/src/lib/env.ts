@@ -18,7 +18,10 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL é obrigatória")
-    .startsWith("postgresql://", "DATABASE_URL deve começar com postgresql://"),
+    .refine(
+      (url) => url.startsWith("postgresql://") || url.startsWith("file:"),
+      "DATABASE_URL deve começar com postgresql:// (PostgreSQL) ou file: (SQLite)"
+    ),
 
   JWT_SECRET: z
     .string()

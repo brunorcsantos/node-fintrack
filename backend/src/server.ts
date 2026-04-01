@@ -93,11 +93,21 @@ async function main() {
 
   // Plugins
   await app.register(cors, {
-    origin: env.FRONTEND_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  });
+  origin: (origin, cb) => {
+    const allowed = [
+      env.FRONTEND_URL,
+      "http://localhost:5173",
+    ];
+    if (!origin || allowed.includes(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Not allowed by CORS"), false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+});
 
   // Access token — verificado pelo middleware `authenticate` em cada rota protegida
   await app.register(jwt, {

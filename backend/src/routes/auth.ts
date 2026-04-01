@@ -275,7 +275,7 @@ export async function authRoutes(app: FastifyInstance) {
       onRequest: [
         async (req, reply) => {
           try {
-            await req.jwtVerify();
+            await req.accessVerify();
           } catch {
             reply.status(401).send({ error: "Não autorizado." });
           }

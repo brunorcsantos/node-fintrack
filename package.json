@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "cors": "^2.8.6"
+  "name": "fintrack",
+  "version": "1.0.0",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "npm run dev:frontend",
+    "build": "cd frontend && npm run build && cd ../backend && npm run build",
+    "start:backend": "cd backend && npm run start",
+    "preview:frontend": "cd frontend && npm run preview"
   }
 }

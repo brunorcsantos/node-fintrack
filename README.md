@@ -1,8 +1,8 @@
 # 💰 FinTrack — Controle Financeiro Pessoal
 
-Aplicação web completa para gerenciamento de finanças pessoais com suporte a tema claro/escuro e layout responsivo para mobile e desktop.
+Aplicação web moderna para gerenciamento de finanças pessoais com suporte a tema claro/escuro, layout responsivo e autenticação JWT.
 
-![Stack](https://img.shields.io/badge/Frontend-React%20%2B%20TypeScript-blue)
+![Stack](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-blue)
 ![Stack](https://img.shields.io/badge/Backend-Fastify%20%2B%20Prisma-green)
 ![Stack](https://img.shields.io/badge/Banco-PostgreSQL-336791)
 
@@ -91,7 +91,7 @@ fintrack/
 ### Pré-requisitos
 
 - Node.js 18+
-- PostgreSQL 15+
+- PostgreSQL 15+ (ou use Docker)
 
 ### 1. Clone o repositório
 
@@ -100,7 +100,7 @@ git clone https://github.com/seu-usuario/fintrack.git
 cd fintrack
 ```
 
-### 2. Configure o Backend
+### 2. Setup do Backend
 
 ```bash
 cd backend
@@ -113,26 +113,23 @@ cp .env.example .env
 # Edite o .env com sua DATABASE_URL e JWT_SECRET
 ```
 
+**Arquivo `.env` esperado:**
 ```env
-DATABASE_URL="postgresql://postgres:sua_senha@localhost:5432/fintrack?schema=public"
-JWT_SECRET="sua-chave-secreta-longa"
-FRONTEND_URL="http://localhost:5173"
+DATABASE_URL="postgresql://postgres:senha@localhost:5432/fintrack?schema=public"
+JWT_SECRET="sua-chave-secreta-muito-longa-min-32-chars"
+JWT_REFRESH_SECRET="sua-chave-refresh-muito-longa-min-32-chars"
 PORT=3333
 ```
 
 ```bash
-# Gere o Prisma Client
-npx prisma generate --schema=prisma/schema.prisma
+# Crie as tabelas no banco de dados
+npx prisma migrate dev --name init
 
-# Crie as tabelas no banco
-npx prisma migrate dev --schema=prisma/schema.prisma --name init
-
-# Inicie o servidor
+# Inicie o servidor (rodará em http://localhost:3333)
 npm run dev
-# API disponível em http://localhost:3333
 ```
 
-### 3. Configure o Frontend
+### 3. Setup do Frontend
 
 ```bash
 cd ../frontend
@@ -141,20 +138,13 @@ cd ../frontend
 npm install
 
 # Configure as variáveis de ambiente
-cp .env.example .env
-```
+echo "VITE_API_URL=http://localhost:3333" > .env
 
-```env
-VITE_API_URL=http://localhost:3333
-```
-
-```bash
-# Inicie o servidor de desenvolvimento
+# Inicie o servidor de desenvolvimento (rodará em http://localhost:5173)
 npm run dev
-# App disponível em http://localhost:5173
 ```
 
-### 4. (Opcional) Popule o banco com dados de exemplo
+### 4. (Opcional) Popule com dados de exemplo
 
 ```bash
 cd backend
@@ -163,76 +153,157 @@ npx tsx prisma/seed.ts seu@email.com
 
 ---
 
-## 🔌 Endpoints da API
+## 📦 Desenvolvimento em Paralelo
 
-| Método | Rota | Autenticação | Descrição |
-|--------|------|:---:|-----------|
-| POST | `/auth/register` | ❌ | Criar conta |
-| POST | `/auth/login` | ❌ | Login → JWT |
-| GET | `/auth/me` | ✅ | Dados do usuário |
-| GET | `/transactions` | ✅ | Listar com filtros |
-| POST | `/transactions` | ✅ | Criar transação |
-| PUT | `/transactions/:id` | ✅ | Atualizar |
-| DELETE | `/transactions/:id` | ✅ | Remover |
-| GET | `/transactions/summary` | ✅ | Dados para gráficos |
-| GET | `/categories` | ✅ | Listar com subcategorias |
-| POST | `/categories` | ✅ | Criar categoria |
-| PUT | `/categories/:id` | ✅ | Atualizar |
-| DELETE | `/categories/:id` | ✅ | Remover |
-| POST | `/categories/:id/subcategories` | ✅ | Criar subcategoria |
-| PUT | `/categories/:id/subcategories/:subId` | ✅ | Atualizar subcategoria |
-| DELETE | `/categories/:id/subcategories/:subId` | ✅ | Remover subcategoria |
-| GET | `/budgets` | ✅ | Listar orçamentos |
-| PUT | `/budgets` | ✅ | Criar ou atualizar |
-| DELETE | `/budgets/:id` | ✅ | Remover |
+Para desenvolvimento simultâneo, abra **dois terminais**:
+
+**Terminal 1 — Backend:**
+```bash
+cd backend && npm run dev
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd frontend && npm run dev
+```
+
+Acesse http://localhost:5173 no navegador. O frontend já está configurado para se conectar ao backend em http://localhost:3333.
+
+---
+
+## 🏗️ Arquitetura
+
+```
+Frontend (React/Vite)          Backend (Fastify/Prisma)
+┌─────────────────────┐        ┌──────────────────────┐
+│ http://localhost:5173│        │ http://localhost:3333│
+├─────────────────────┤        ├──────────────────────┤
+│ React Components    │        │ Fastify Routes       │
+│ Context (Auth/Theme)│ ◄─────► │ Prisma ORM           │
+│ Hooks (API/Data)    │ (JSON)  │ PostgreSQL Schema    │
+│ Vite Dev Server     │        │ JWT Auth Middleware  │
+└─────────────────────┘        └──────────────────────┘
+```
+
+**Fluxo de Comunicação:**
+1. Frontend faz requisições HTTP para Backend
+2. Backend valida JWT no header `Authorization: Bearer <token>`
+3. Response retorna dados JSON
+4. Frontend atualiza state React e renderiza
+
+---
+
+## 🔐 Autenticação
+
+O sistema utiliza **JWT com refresh tokens**:
+
+1. **Login** → POST `/auth/login` retorna `accessToken` (15min) + `refreshToken` (7d)
+2. **Requisições** → Header `Authorization: Bearer <accessToken>`
+3. **Token expira** → Frontend detecta erro 401 e faz POST `/auth/refresh`
+4. **Novo accessToken** → Requisição é retentada automaticamente
 
 ---
 
 ## 🗄️ Schema do Banco de Dados
 
 ```
-User
- ├── Category (1:N)
- │    └── Subcategory (1:N)
- ├── Transaction (1:N) → Category → Subcategory
- └── Budget (1:N) → Category → Subcategory
+User (1:N)
+ ├── Category + Subcategory
+ ├── Transaction → Category → Subcategory
+ ├── Transaction → CreditCard (transações de cartão)
+ ├── Budget → Category
+ ├── CreditCard
+ ├── CreditCardInvoice
+ ├── RecurringTransaction
+ └── NotificationLog
 ```
 
 ---
 
-## 🛠️ Stack Tecnológica
+## 🔌 Endpoints da API
 
-### Backend
-| Tecnologia | Versão | Função |
-|---|---|---|
-| Fastify | 4 | Servidor HTTP |
-| TypeScript | 5 | Tipagem estática |
-| Prisma | 5 | ORM |
-| PostgreSQL | 15+ | Banco de dados |
-| JWT | — | Autenticação |
-| Zod | 3 | Validação de schemas |
-| bcryptjs | — | Hash de senhas |
-
-### Frontend
-| Tecnologia | Versão | Função |
-|---|---|---|
-| React | 18 | UI |
-| TypeScript | 5 | Tipagem estática |
-| Vite | 5 | Bundler |
-| Recharts | 2 | Gráficos |
-| emoji-picker-element | — | Seletor de emojis |
+| Método | Rota | Auth | Descrição |
+|--------|------|:---:|-----------|
+| POST | `/auth/register` | ❌ | Criar conta |
+| POST | `/auth/login` | ❌ | Login → JWT |
+| POST | `/auth/refresh` | ❌ | Renovar token |
+| GET | `/auth/me` | ✅ | Dados do usuário |
+| GET | `/transactions` | ✅ | Listar transações |
+| POST | `/transactions` | ✅ | Criar transação |
+| PUT | `/transactions/:id` | ✅ | Atualizar transação |
+| DELETE | `/transactions/:id` | ✅ | Remover transação |
+| GET | `/categories` | ✅ | Listar categorias |
+| POST | `/categories` | ✅ | Criar categoria |
+| PUT | `/categories/:id` | ✅ | Atualizar categoria |
+| DELETE | `/categories/:id` | ✅ | Remover categoria |
+| GET | `/budgets` | ✅ | Listar orçamentos |
+| PUT | `/budgets` | ✅ | Criar/atualizar orçamento |
+| DELETE | `/budgets/:id` | ✅ | Remover orçamento |
+| GET | `/credit-cards` | ✅ | Listar cartões |
+| POST | `/credit-cards` | ✅ | Criar cartão |
+| GET | `/notifications` | ✅ | Listar notificações |
 
 ---
 
-## 🔮 Próximos Passos
+## � Troubleshooting
 
-- [ ] Deploy — Vercel (frontend) + Render/Fly.io (backend)
-- [ ] Edição de lançamentos
-- [ ] Perfil do usuário (alterar nome e senha)
-- [ ] Paginação nos lançamentos
+### Backend não conecta ao PostgreSQL
+```bash
+# Verifique se PostgreSQL está rodando
+# No Windows: Services → PostgreSQL
+# No Mac: brew services list
+# No Linux: sudo systemctl status postgresql
+
+# Teste a conexão manualmente
+psql "postgresql://user:password@localhost:5432/fintrack"
+```
+
+### Frontend mostra erro de conexão
+1. Verifique se Backend está rodando: http://localhost:3333
+2. Verifique a variável `VITE_API_URL` em `frontend/.env`
+3. Abra DevTools (F12) → Network → verifique requests
+
+### Prisma Client outdated
+```bash
+cd backend
+npx prisma generate
+npm run dev
+```
+
+### Porta 3333 ou 5173 já está em uso
+```bash
+# Windows: liberar porta 3333
+netstat -ano | findstr :3333
+taskkill /PID <PID> /F
+
+# Mac/Linux: liberar porta 3333
+lsof -ti :3333 | xargs kill -9
+```
+
+---
+
+## 📚 Recursos Úteis
+
+- [Fastify Docs](https://www.fastify.io/docs/latest/)
+- [Prisma Docs](https://www.prisma.io/docs/)
+- [React Docs](https://react.dev)
+- [Vite Docs](https://vitejs.dev)
+- [PostgreSQL Docs](https://www.postgresql.org/docs/)
+
+---
+
+## 🔮 Roadmap
+
+- [ ] Deploy na Vercel (frontend) + Railway/Render (backend)
+- [ ] Edição de transações no modal
+- [ ] Perfil do usuário (nome, senha, preferências)
+- [ ] Paginação inteligente nos lançamentos
 - [ ] Exportar relatórios em PDF
-- [ ] Busca e filtros avançados por descrição
-- [ ] Notificações de orçamento próximo do limite
+- [ ] Busca full-text por descrição
+- [ ] Notificações email de orçamentos
+- [ ] Sincronização banco com instituições (Open Banking)
+- [ ] App mobile PWA com Capacitor
+- [ ] Análise preditiva de gastos (ML)
 
 ---
 

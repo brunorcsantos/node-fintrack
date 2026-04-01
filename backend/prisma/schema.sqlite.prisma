@@ -1,0 +1,234 @@
+// prisma/schema.sqlite.prisma
+// Schema para SQLite (usado no Electron desktop)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  transactions Transaction[]
+  categories   Category[]
+  budgets      Budget[]
+  recurring    RecurringTransaction[]
+  notifications Notification[]
+  creditCards   CreditCard[]
+  creditCardTransactions CreditCardTransaction[]
+  creditCardInvoices     CreditCardInvoice[]
+  refreshTokens RefreshToken[]
+}
+
+model Category {
+  id            String        @id @default(uuid())
+  slug          String        // e.g. "moradia"
+  name          String
+  icon          String
+  color         String
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+
+  subcategories Subcategory[]
+  transactions  Transaction[]
+  budgets       Budget[]
+  recurring     RecurringTransaction[]
+  creditCardTransactions CreditCardTransaction[]
+
+  @@unique([slug, userId])
+}
+
+model Subcategory {
+  id           String        @id @default(uuid())
+  slug         String
+  name         String
+  icon         String
+  categoryId   String
+  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
+
+  transactions Transaction[]
+  budgets      Budget[]
+  recurring    RecurringTransaction[]
+  creditCardTransactions CreditCardTransaction[]
+
+  @@unique([slug, categoryId])
+}
+
+model Transaction {
+  id            String       @id @default(uuid())
+  description   String
+  amount        Float        // SQLite usa Float em vez de Decimal
+  type          String       // TxType: income | expense (SQLite não suporta enums)
+  date          DateTime
+  notes         String?
+  userId        String
+  categoryId    String
+  subcategoryId String?
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category     @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, categoryId])
+}
+
+model Budget {
+  id            String       @id @default(uuid())
+  amount        Float        // SQLite usa Float em vez de Decimal
+  month         String       // format: "2026-03"
+  userId        String
+  categoryId    String?
+  subcategoryId String?
+
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?    @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  createdAt     DateTime     @default(now())
+
+  @@unique([userId, categoryId, subcategoryId, month])
+}
+
+model RecurringTransaction {
+  id              String    @id @default(uuid())
+  description     String
+  amount          Float?    // SQLite usa Float em vez de Decimal
+  type            String    // TxType: income | expense (SQLite não suporta enums)
+  categoryId      String
+  subcategoryId   String?
+  userId          String
+  frequency       String    // Frequency: monthly | yearly (SQLite não suporta enums)
+  dayOfMonth      Int
+  startDate       DateTime
+  endDate         DateTime?
+  active          Boolean   @default(true)
+  lastCreatedAt   DateTime?
+  mode            String    @default("indefinite") // RecurringMode: indefinite | installments (SQLite não suporta enums)
+  installments    Int?      // número de parcelas (apenas para mode = installments)
+  creditCardId    String?
+  createdAt       DateTime  @default(now())
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category    @relation(fields: [categoryId], references: [id])
+  subcategory   Subcategory? @relation(fields: [subcategoryId], references: [id])
+  creditCard    CreditCard? @relation(fields: [creditCardId], references: [id], onDelete: SetNull)
+
+  @@index([userId, active])
+}
+
+// SQLite não suporta enums nativamente
+// Use strings com validação no código da aplicação:
+// RecurringMode: "indefinite" | "installments"
+// Frequency: "monthly" | "yearly"
+// NotificationType: "invoice_due" | "budget_alert" | "recurring_pending" | "promotion" | "custom"
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String
+  type        String    // NotificationType: invoice_due | budget_alert | recurring_pending | promotion | custom (SQLite não suporta enums)
+  title       String
+  message     String
+  read        Boolean   @default(false)
+  data        String?   // JSON serializado como String (SQLite não suporta Json)
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+// TxType: "income" | "expense" - definido como String acima
+
+model CreditCard {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String                    // Ex: Nubank, Itaú
+  icon            String   @default("💳")  // Emoji do cartão
+  color           String   @default("#5A8FE8")
+  closingDay      Int                       // Dia de fechamento (1-31)
+  dueDay          Int                       // Dia de vencimento (1-31)
+  limit           Float?                    // SQLite usa Float em vez de Decimal
+  active          Boolean  @default(true)
+  notifyDaysBefore Int     @default(3)      // Dias antes do vencimento para notificar
+  createdAt       DateTime @default(now())
+
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions    CreditCardTransaction[]
+  invoices        CreditCardInvoice[]
+  recurring       RecurringTransaction[]
+
+  @@index([userId, active])
+}
+
+model CreditCardTransaction {
+  id           String     @id @default(uuid())
+  cardId       String
+  userId       String
+  description  String
+  amount       Float      // SQLite usa Float em vez de Decimal
+  date         DateTime                      // Data da compra
+  invoiceMonth String                        // Mês da fatura YYYY-MM
+  notes        String?
+  categoryId   String
+  subcategoryId String?
+  createdAt    DateTime   @default(now())
+
+  card         CreditCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category    @relation(fields: [categoryId], references: [id])
+  subcategory  Subcategory? @relation(fields: [subcategoryId], references: [id])
+
+  @@index([cardId, invoiceMonth])
+  @@index([userId, invoiceMonth])
+}
+
+model CreditCardInvoice {
+  id           String        @id @default(uuid())
+  cardId       String
+  userId       String
+  month        String                        // Mês da fatura YYYY-MM
+  dueDate      DateTime                      // Data de vencimento
+  totalAmount  Float         // SQLite usa Float em vez de Decimal
+  paid         Boolean       @default(false)
+  paidAt       DateTime?
+  transactionId String?                      // Lançamento gerado ao pagar
+  createdAt    DateTime      @default(now())
+
+  card         CreditCard    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, month])
+  @@index([userId, paid])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}

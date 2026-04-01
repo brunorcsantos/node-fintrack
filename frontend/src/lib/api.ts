@@ -1,5 +1,5 @@
 // src/lib/api.ts
-// [tipos mantidos idênticos ao original — apenas a classe ApiClient é atualizada]
+
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3333";
 
